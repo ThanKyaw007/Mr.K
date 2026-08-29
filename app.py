@@ -9,6 +9,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # ====== API Keys ======
 TELEGRAM_BOT_TOKEN = "8617869426:AAHSSyjxzn6Jd_NfOqseGM82ZoCo1EGGbNE"
 OPENROUTER_API_KEY = "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"
+
 # ====== Flask ဝဘ်ဆာဗာ (Render အတွက်) ======
 flask_app = Flask(__name__)
 
@@ -22,7 +23,7 @@ def health():
 
 # ====== OpenRouter Settings ======
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL = "google/gemini-2.5-flash"  # ဒါမှမဟုတ် "openai/gpt-3.5-turbo"
+MODEL = "openai/gpt-3.5-turbo"  # ဒီမော်ဒယ်က အလုပ်လုပ်ပါတယ် (Gemini က မရတော့ဘူး)
 
 # ====== /start ======
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -64,7 +65,6 @@ async def price(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     symbol = context.args[0].upper()
     
-    # CoinGecko ID mapping
     coin_ids = {
         "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana",
         "BNB": "binancecoin", "XRP": "ripple", "ADA": "cardano",
@@ -87,7 +87,7 @@ async def price(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"😅 ဈေးနှုန်းယူလို့မရဘူး။ Error: {str(e)[:50]}")
 
-# ====== /analyze (AI က ခွဲခြမ်းစိတ်ဖြာမယ်) ======
+# ====== /analyze ======
 async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("⚠️ ကျေးဇူးပြုပြီး /analyze BTC လို့ ရိုက်ထည့်ပါ။")
@@ -97,7 +97,6 @@ async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"🔍 {coin} ကို ခွဲခြမ်းစိတ်ဖြာနေပါတယ်...")
     
     try:
-        # ဈေးနှုန်းအရင်ယူမယ်
         coin_ids = {
             "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana",
             "BNB": "binancecoin", "XRP": "ripple", "ADA": "cardano"
@@ -108,7 +107,6 @@ async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
         price_data = price_response.json()
         current_price = price_data.get(coin_id, {}).get("usd", "မရှိပါ")
         
-        # AI ကို ခွဲခြမ်းစိတ်ဖြာခိုင်းမယ်
         prompt = f"""
         ကျေးဇူးပြုပြီး {coin} cryptocurrency ရဲ့ လက်ရှိဈေးကွက်အခြေအနေကို ခွဲခြမ်းစိတ်ဖြာပေးပါ။
         လက်ရှိဈေးနှုန်း: ${current_price}
@@ -145,7 +143,7 @@ async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"😅 Error: {str(e)[:100]}")
 
-# ====== /news (CryptoCompare API) ======
+# ====== /news ======
 async def news(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("📰 သတင်းတွေကို ရှာနေပါတယ်...")
     
@@ -154,7 +152,7 @@ async def news(update: Update, context: ContextTypes.DEFAULT_TYPE):
         response = requests.get(url)
         data = response.json()
         
-        news_list = data.get("Data", [])[:5]  # သတင်း ၅ ခုပဲယူမယ်
+        news_list = data.get("Data", [])[:5]
         
         if not news_list:
             await update.message.reply_text("😅 သတင်းမရှိပါဘူး။ နောက်မှ ပြန်ကြည့်ပါ။")
@@ -171,7 +169,7 @@ async def news(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"😅 သတင်းယူလို့မရဘူး။ Error: {str(e)[:50]}")
 
-# ====== /ask (AI ကိုမေးရန်) ======
+# ====== /ask ======
 async def ask_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("⚠️ ကျေးဇူးပြုပြီး /ask [မေးခွန်း] လို့ ရိုက်ထည့်ပါ။")
@@ -225,13 +223,11 @@ async def change_model(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
     
-    # သာမန်စကားပြောပုံစံ
     if any(word in user_message.lower() for word in ["ဟိုင်း", "မင်္ဂလာ", "hello", "hi"]):
         await update.message.reply_text("မင်္ဂလာပါ! ကျွန်တော် Trading ဆရာကြီး ဘော့ပါ။ ဘာကူညီပေးရမလဲ?")
         return
     
     if "ဈေး" in user_message or "price" in user_message:
-        # ဈေးနှုန်းမေးတာဆိုရင်
         words = user_message.split()
         for word in words:
             if word.upper() in ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE"]:
@@ -239,7 +235,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await price(update, context)
                 return
     
-    # ကျန်တာတွေကို AI က ဖြေမယ်
     await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
     
     try:
@@ -266,15 +261,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"😅 Error: {str(e)[:100]}")
 
-# ====== အဓိကအပိုင်း ======
-def main():
-    def run_bot():
+# ====== run_bot Function (အပြင်မှာ တိုက်ရိုက်သတ်မှတ်ထားတယ်) ======
+def run_bot():
     """Telegram ဘော့ကို သီးခြား Thread နဲ့ စတင်မယ်"""
     print("🤖 ဘော့စတင်နေပါပြီ...")
     
-    telegram_app = Application.builder().token(BOT_TOKEN).build()
+    # TELEGRAM_BOT_TOKEN ကို သုံးပါ
+    telegram_app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     
-    # ====== ခင်ဗျားရဲ့ Handler တွေ အကုန်လုံးကို ဒီမှာ ထည့်ပါ ======
+    # Handler တွေ
     telegram_app.add_handler(CommandHandler("start", start))
     telegram_app.add_handler(CommandHandler("help", help_command))
     telegram_app.add_handler(CommandHandler("price", price))
@@ -284,16 +279,16 @@ def main():
     telegram_app.add_handler(CommandHandler("model", show_model))
     telegram_app.add_handler(CommandHandler("change", change_model))
     telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    # ==========================================================
     
     print("✅ ဘော့ အဆင်သင့်ဖြစ်ပါပြီ!")
     telegram_app.run_polling(allowed_updates=Update.ALL_TYPES)
 
+# ====== အဓိကအပိုင်း ======
 if __name__ == "__main__":
     # ဘော့ကို နောက်ခံ Thread နဲ့ စတင်မယ်
     bot_thread = threading.Thread(target=run_bot)
     bot_thread.start()
     
-    # Flask ဆာဗာကို စတင်မယ် (Render ရဲ့ PORT ကို နားထောင်မယ်)
+    # Flask ဆာဗာကို စတင်မယ်
     port = int(os.environ.get("PORT", 5000))
     flask_app.run(host="0.0.0.0", port=port)
