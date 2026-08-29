@@ -6,11 +6,11 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from google import genai  # ← import အသစ်
 
 # ====== API Keys ======
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")  # Render Environment ကနေ ယူမယ်
-GEMINI_API_KEY = "AQ.Ab8RN6K1YM_LneLp_lX5R7YyPa1RgBu9bR_1JzKa-q_WyocMug"  # သင့် Gemini Key
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+GEMINI_API_KEY = "AQ.Ab8RN6K1YM_LneLp_lX5R7YyPa1RgBu9bR_1JzKa-q_WyocMug"
 
-# ====== Gemini Client (ပြင်ဆင်ပုံအသစ်) ======
-client = genai.Client(api_key=GEMINI_API_KEY)
+# ====== Gemini Client ======
+client = genai.Client(api_key=GEMINI_API_KEY)  # ← ဒီလိုပြောင်းပါ
 
 # ====== Flask ======
 flask_app = Flask(__name__)
@@ -31,7 +31,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "ကျွန်တော် သဘာဝအတိုင်း ပြန်ဖြေပေးပါ့မယ်။"
     )
 
-# ====== စကားပြောသလိုမေးရင် AI က ပြန်ဖြေမယ် ======
+# ====== handle_message ======
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
     
