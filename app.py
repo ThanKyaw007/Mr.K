@@ -6,9 +6,8 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # ====== API Keys ======
-TELEGRAM_BOT_TOKEN = os.environ.get("8617869426:AAHSSyjxzn6Jd_NfOqseGM82ZoCo1EGGbNE")
-GEMINI_API_KEY = "AQ.Ab8RN6K1YM_LneLp_lX5R7YyPa1RgBu9bR_1JzKa-q_WyocMug
-"  # ခင်ဗျားရဲ့ Gemini Key ကို ထည့်ပါ
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")  # ← ပြင်ပြီး
+GEMINI_API_KEY = "AQ.Ab8RN6K1YM_LneLp_lX5R7YyPa1RgBu9bR_1JzKa-q_WyocMug"  # ← ပြင်ပြီး
 
 # ====== Gemini ကို ပြင်ဆင်ပါ ======
 genai.configure(api_key=GEMINI_API_KEY)
@@ -57,7 +56,7 @@ def run_bot():
     print("🤖 ဘော့စတင်နေပါပြီ...")
     
     if not TELEGRAM_BOT_TOKEN:
-        print("❌ TELEGRAM_BOT_TOKEN မရှိပါ!")
+        print("❌ TELEGRAM_BOT_TOKEN မရှိပါ! Environment Variables ကို စစ်ပါ။")
         return
     
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
