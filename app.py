@@ -28,106 +28,43 @@ MODEL = "openai/gpt-3.5-turbo"  # ဒီမော်ဒယ်က အလုပ်
 # ====== /start ======
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📊 **Trading ဆရာကြီး ဘော့** မှ ကြိုဆိုပါတယ်!\n\n"
+        "🙏 မင်္ဂလာပါ။ ကျွန်တော် သင့်အတွက် အကူအညီပေးနိုင်တဲ့ လက်ထောက်တစ်ယောက်ပါ။\n\n"
         "🔹 /price [coin] - Crypto ဈေးနှုန်းကြည့်ရန်\n"
         "   (ဥပမာ: /price BTC, /price ETH)\n"
         "🔹 /analyze [coin] - နည်းပညာပိုင်း ခွဲခြမ်းစိတ်ဖြာရန်\n"
         "🔹 /news - နောက်ဆုံးရ Crypto သတင်းများ\n"
-        "🔹 /ask [မေးခွန်း] - AI ကို ဘာမဆိုမေးရန်\n"
+        "🔹 /ask [မေးခွန်း] - ဘာမဆိုမေးရန်\n"
         "🔹 /model - လက်ရှိသုံးနေတဲ့ မော်ဒယ်ကိုကြည့်ရန်\n"
         "🔹 /help - အကူအညီ"
     )
-
-# ====== /help ======
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "📌 **အသုံးပြုနည်း:**\n\n"
-        "📈 **ဈေးနှုန်းကြည့်ရန်**\n"
-        "/price BTC - Bitcoin ဈေးနှုန်း\n"
-        "/price ETH - Ethereum ဈေးနှုန်း\n"
-        "/price SOL - Solana ဈေးနှုန်း\n\n"
-        "🔍 **ခွဲခြမ်းစိတ်ဖြာရန်**\n"
-        "/analyze BTC - Bitcoin ကို နည်းပညာပိုင်း ခွဲခြမ်းစိတ်ဖြာမယ်\n\n"
-        "📰 **သတင်းများ**\n"
-        "/news - နောက်ဆုံးရ Crypto သတင်း ၅ ခု\n\n"
-        "🤖 **AI ကိုမေးရန်**\n"
-        "/ask [မေးခွန်း] - ဘာမဆို မေးလို့ရတယ်\n"
-        "ဥပမာ: /ask Bitcoin အနာဂတ်ဘယ်လိုလဲ\n\n"
-        "🧠 **မော်ဒယ်ပြောင်းရန်**\n"
-        "/change [model_name] - မော်ဒယ်ပြောင်းမယ်"
-    )
-
-# ====== /price (CoinGecko API) ======
-async def price(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def ask_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
-        await update.message.reply_text("⚠️ ကျေးဇူးပြုပြီး /price BTC လို့ ရိုက်ထည့်ပါ။")
+        await update.message.reply_text("🙏 ကျေးဇူးပြုပြီး /ask [မေးခွန်း] လို့ ရိုက်ထည့်ပါ။")
         return
     
-    symbol = context.args[0].upper()
-    
-    coin_ids = {
-        "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana",
-        "BNB": "binancecoin", "XRP": "ripple", "ADA": "cardano",
-        "DOT": "polkadot", "DOGE": "dogecoin", "LINK": "chainlink",
-        "AVAX": "avalanche-2", "MATIC": "matic-network", "UNI": "uniswap"
-    }
-    
-    coin_id = coin_ids.get(symbol, symbol.lower())
+    user_question = " ".join(context.args)
+    await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
     
     try:
-        url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd"
-        response = requests.get(url)
-        data = response.json()
-        price = data.get(coin_id, {}).get("usd")
-        
-        if price:
-            await update.message.reply_text(f"💵 **{symbol}** ဈေးနှုန်း: **${price:,.2f}** USD")
-        else:
-            await update.message.reply_text(f"⚠️ {symbol} ကို ရှာမတွေ့ပါ။ /price BTC လို့ ရိုက်ပါ။")
-    except Exception as e:
-        await update.message.reply_text(f"😅 ဈေးနှုန်းယူလို့မရဘူး။ Error: {str(e)[:50]}")
-
-# ====== /analyze ======
-async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        await update.message.reply_text("⚠️ ကျေးဇူးပြုပြီး /analyze BTC လို့ ရိုက်ထည့်ပါ။")
-        return
-    
-    coin = context.args[0].upper()
-    await update.message.reply_text(f"🔍 {coin} ကို ခွဲခြမ်းစိတ်ဖြာနေပါတယ်...")
-    
-    try:
-        coin_ids = {
-            "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana",
-            "BNB": "binancecoin", "XRP": "ripple", "ADA": "cardano"
-        }
-        coin_id = coin_ids.get(coin, coin.lower())
-        price_url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd"
-        price_response = requests.get(price_url)
-        price_data = price_response.json()
-        current_price = price_data.get(coin_id, {}).get("usd", "မရှိပါ")
-        
-        prompt = f"""
-        ကျေးဇူးပြုပြီး {coin} cryptocurrency ရဲ့ လက်ရှိဈေးကွက်အခြေအနေကို ခွဲခြမ်းစိတ်ဖြာပေးပါ။
-        လက်ရှိဈေးနှုန်း: ${current_price}
-        
-        အောက်ပါအချက်တွေကို ထည့်သွင်းစဉ်းစားပေးပါ:
-        1. ဈေးကွက်အခြေအနေ (မတည်ငြိမ်မှု၊ လမ်းကြောင်း)
-        2. နည်းပညာပိုင်း အညွှန်းကိန်းများ (RSI, Moving Average)
-        3. ဝယ်သင့်/ရောင်းသင့် အကြံပြုချက်
-        4. အနာဂတ်ခန့်မှန်းချက်
-        
-        မြန်မာလိုနဲ့ ရှင်းရှင်းလင်းလင်း ဖြေပေးပါ။
-        """
-        
         headers = {
             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
             "Content-Type": "application/json"
         }
         data = {
             "model": MODEL,
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 800,
+            "messages": [
+                {"role": "system", "content": """
+                သင်ဟာ ယဉ်ကျေးပြီး အကူအညီပေးတတ်တဲ့ လက်ထောက်တစ်ယောက်ပါ။
+                မေးခွန်းတွေကို သဘာဝကျကျ၊ ရိုးရိုးသားသား ဖြေကြားပါ။
+                ကိုယ့်ကိုယ်ကို ဆရာကြီး၊ ပါရဂူ စသဖြင့် မခေါ်ပါနဲ့။
+                အဖြေတွေကို မြန်မာလိုပဲ ဖြေပါ။
+                ဖြေတဲ့အခါ ယဉ်ယဉ်ကျေးကျေးနဲ့ ရိုရိုသေသေ ဖြေပါ။
+                မေးခွန်းတွေကို အားပေးတဲ့အနေနဲ့ "သိချင်တာမေးပါနော်" လိုမျိုး ပြောပေးပါ။
+                Trading အကြောင်းသာမက အခြားမေးခွန်းတွေ (ဥပမာ- ဘာသာစကား၊ ပညာရေး၊ နည်းပညာ၊ နေ့စဉ်ဘဝအကြောင်း) ကိုလည်း ဖြေပေးပါ။
+                """},
+                {"role": "user", "content": user_question}
+            ],
+            "max_tokens": 500,
             "temperature": 0.7
         }
         
@@ -136,13 +73,12 @@ async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if "choices" in response_data:
             reply = response_data["choices"][0]["message"]["content"].strip()
-            await update.message.reply_text(f"📊 **{coin} ခွဲခြမ်းစိတ်ဖြာချက်**\n\n{reply}")
+            await update.message.reply_text(reply)
         else:
-            await update.message.reply_text("😅 ခွဲခြမ်းစိတ်ဖြာလို့မရဘူး။ နောက်မှ ပြန်ကြည့်ပါ။")
+            await update.message.reply_text("😅 ပြန်မဖြေနိုင်ဘူး။ နောက်မှ ပြန်ကြည့်ပါ။")
             
     except Exception as e:
         await update.message.reply_text(f"😅 Error: {str(e)[:100]}")
-
 # ====== /news ======
 async def news(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("📰 သတင်းတွေကို ရှာနေပါတယ်...")
