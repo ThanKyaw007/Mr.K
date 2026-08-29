@@ -6,7 +6,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from google import genai  # ← import အသစ်
 
 # ====== API Keys ======
-TELEGRAM_BOT_TOKEN = 8617869426:AAHSSyjxzn6Jd_NfOqseGM82ZoCo1EGGbNE
+TELEGRAM_BOT_TOKEN = "8617869426:AAHSSyjxzn6Jd_NfOqseGM82ZoCo1EGGbNE"
 GEMINI_API_KEY = "AQ.Ab8RN6K1YM_LneLp_lX5R7YyPa1RgBu9bR_1JzKa-q_WyocMug"
 
 # ====== Gemini Client ======
