@@ -23,7 +23,7 @@ def health():
 
 # ====== OpenRouter Settings ======
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL = "openai/gpt-3.5-turbo"  # ဒီမော်ဒယ်က အလုပ်လုပ်ပါတယ်
+MODEL = "openai/gpt-3.5-turbo"
 
 # ====== /start ======
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -54,12 +54,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
     
-    # နှုတ်ဆက်စကားတွေအတွက်
     if any(word in user_message.lower() for word in ["ဟိုင်း", "မင်္ဂလာ", "hello", "hi"]):
         await update.message.reply_text("မင်္ဂလာပါ။ ကျွန်တော် ဒီမှာရှိပါတယ်။ သိချင်တာမေးပါနော်။")
         return
     
-    # ကျန်တာတွေကို AI က ဖြေမယ်
     await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
     
     try:
@@ -76,7 +74,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 အဖြေတွေကို မြန်မာလိုပဲ ဖြေပါ။
                 ဖြေတဲ့အခါ ယဉ်ယဉ်ကျေးကျေးနဲ့ ရိုရိုသေသေ ဖြေပါ။
                 မေးခွန်းတွေကို အားပေးတဲ့အနေနဲ့ "သိချင်တာမေးပါနော်" လိုမျိုး ပြောပေးပါ။
-                Trading အကြောင်းသာမက အခြားမေးခွန်းတွေ (ဥပမာ- ဘာသာစကား၊ ပညာရေး၊ နည်းပညာ၊ နေ့စဉ်ဘဝအကြောင်း) ကိုလည်း ဖြေပေးပါ။
+                Trading အကြောင်းသာမက အခြားမေးခွန်းတွေကိုလည်း ဖြေပေးပါ။
                 """},
                 {"role": "user", "content": user_message}
             ],
