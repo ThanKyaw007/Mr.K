@@ -23,7 +23,7 @@ def health():
 
 # ====== OpenRouter Settings ======
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL = "openai/gpt-3.5-turbo"
+MODEL = "openai/gpt-3.5-turbo:free"
 
 # ====== /start ======
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
