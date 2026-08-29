@@ -1,17 +1,16 @@
 import os
 import threading
-import google.generativeai as genai
 from flask import Flask
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from google import genai  # ← import အသစ်
 
 # ====== API Keys ======
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")  # ← Render Environment ကနေ ယူမယ်
-GEMINI_API_KEY = "AQ.Ab8RN6K1YM_LneLp_lX5R7YyPa1RgBu9bR_1JzKa-q_WyocMug"  # ← ဒီအတိုင်းထားလို့ရတယ်
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")  # Render Environment ကနေ ယူမယ်
+GEMINI_API_KEY = "AQ.Ab8RN6K1YM_LneLp_lX5R7YyPa1RgBu9bR_1JzKa-q_WyocMug"  # သင့် Gemini Key
 
-# ====== Gemini ကို ပြင်ဆင်ပါ ======
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-2.5-flash')
+# ====== Gemini Client (ပြင်ဆင်ပုံအသစ်) ======
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 # ====== Flask ======
 flask_app = Flask(__name__)
@@ -43,7 +42,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
     
     try:
-        response = model.generate_content(user_message)
+        # AI ကိုခေါ်တဲ့ပုံစံအသစ်
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=user_message
+        )
         reply = response.text
         if len(reply) > 4000:
             reply = reply[:4000] + "..."
