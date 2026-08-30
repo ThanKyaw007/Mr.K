@@ -1,7 +1,6 @@
 import os
 import threading
 import re
-import requests
 from flask import Flask
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
@@ -26,7 +25,6 @@ def home():
 def health():
     return "OK", 200
 
-# ====== clean_text ======
 def clean_text(text):
     text = re.sub(r'https?://\S+', '', text)
     text = re.sub(r't\.me/\S+', '', text)
@@ -42,7 +40,6 @@ def clean_text(text):
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
-# ====== /start ======
 def start(update: Update, context: CallbackContext):
     update.message.reply_text(
         "🙏 မင်္ဂလာပါ။ ကျွန်တော် **Mr.T** (မစ္စတာသန်း) ပါ။\n\n"
@@ -50,7 +47,6 @@ def start(update: Update, context: CallbackContext):
         "ကျွန်တော် သဘာဝအတိုင်း ပြန်ဖြေပေးပါ့မယ်။"
     )
 
-# ====== handle_message ======
 def handle_message(update: Update, context: CallbackContext):
     user_message = update.message.text
 
@@ -78,7 +74,6 @@ def handle_message(update: Update, context: CallbackContext):
     except Exception as e:
         update.message.reply_text(f"😅 Error: {str(e)[:100]}")
 
-# ====== run_bot ======
 def run_bot():
     print("🤖 ဘော့စတင်နေပါပြီ...")
     updater = Updater(TELEGRAM_BOT_TOKEN, use_context=True)
