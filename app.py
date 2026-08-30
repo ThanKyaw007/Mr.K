@@ -12,7 +12,7 @@ GROQ_API_KEY = "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"
 
 # ====== Groq Settings ======
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-MODEL = "openai/gpt-oss-120b"  # အကောင်းဆုံး ရွေးချယ်မှု
+MODEL = "openai/gpt-oss-120b"
 
 # ====== Flask ======
 flask_app = Flask(__name__)
@@ -61,7 +61,7 @@ def welcome(update: Update, context: CallbackContext):
     for member in update.message.new_chat_members:
         update.message.reply_text(f"👋 {member.first_name} ကို ကြိုဆိုပါတယ်!")
 
-# ====== သော့ချက်စကားလုံး အလိုအလျောက်ပြန်ကြားခြင်း ======
+# ====== သော့ချက်စကားလုံး ======
 def auto_reply(update: Update, context: CallbackContext):
     text = update.message.text
     if text and "မင်္ဂလာပါ" in text:
@@ -70,7 +70,7 @@ def auto_reply(update: Update, context: CallbackContext):
     if text and "ကျေးဇူး" in text:
         update.message.reply_text("ရပါတယ်။ ကြိုဆိုပါတယ်။")
 
-# ====== AI စကားပြော (Echo + Groq) ======
+# ====== AI စကားပြော ======
 def handle_message(update: Update, context: CallbackContext):
     user_message = update.message.text
 
@@ -88,7 +88,7 @@ def handle_message(update: Update, context: CallbackContext):
         data = {
             "model": MODEL,
             "messages": [
-                {"role": "system", "content": "သင်ဟာ Mr.T (မစ္စတာသန်း) ပါ။ ယဉ်ကျေးပြီး အကူအညီပေးတတ်တဲ့ လက်ထောက်တစ်ယောက်ပါ။ မြန်မာလိုပဲ ဖြေပါ။ သင့်ကိုယ်သင် ရည်ညွှန်းတဲ့အခါ 'ကျွန်တော်' ဆိုတဲ့ စကားလုံးကိုပဲ သုံးပါ။ သင့်ရဲ့အဖြေတွေမှာ ဘယ်လိုလင့်ခ်မျိုးမှ မထည့်ပါနဲ့။"},
+                {"role": "system", "content": "သင်ဟာ ယဉ်ကျေးပြီး အကူအညီပေးတတ်တဲ့ လက်ထောက်တစ်ယောက်ပါ။ မြန်မာလိုပဲ ဖြေပါ။ သင့်ကိုယ်သင် ရည်ညွှန်းတဲ့အခါ 'ကျွန်တော်' ဆိုတဲ့ စကားလုံးကိုပဲ သုံးပါ။ သင့်ရဲ့အဖြေတွေမှာ ဘယ်လိုလင့်ခ်မျိုးမှ မထည့်ပါနဲ့။"},
                 {"role": "user", "content": user_message}
             ],
             "max_tokens": 500,
@@ -131,7 +131,6 @@ def run_bot():
     updater = Updater(TELEGRAM_BOT_TOKEN, use_context=True)
     dp = updater.dispatcher
 
-    # ====== Handler တွေ ======
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(CommandHandler("ban", ban))
     dp.add_handler(CommandHandler("warn", warn))
