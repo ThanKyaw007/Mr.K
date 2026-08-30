@@ -78,10 +78,10 @@ def auto_reply(update: Update, context: CallbackContext):
 # ====== AI စကားပြော ======
 # ====== AI စကားပြော ======
 # ====== AI စကားပြော ======
+# ====== AI စကားပြော ======
 def handle_message(update: Update, context: CallbackContext):
     user_message = update.message.text
 
-    # နှုတ်ဆက်စကားတွေအတွက်
     if any(word in user_message.lower() for word in ["ဟိုင်း", "မင်္ဂလာ", "hello", "hi"]):
         update.message.reply_text("မင်္ဂလာပါ။ ကျွန်တော် ဒီမှာရှိပါတယ်။ သိချင်တာမေးပါနော်။")
         return
@@ -96,7 +96,7 @@ def handle_message(update: Update, context: CallbackContext):
         data = {
             "model": MODEL,
             "messages": [
-                {"role": "system", "content": "သင်ဟာ ယဉ်ကျေးပြီး အကူအညီပေးတတ်တဲ့ လက်ထောက်တစ်ယောက်ပါ။ မြန်မာလိုပဲ ဖြေပါ။ သင့်ကိုယ်သင် ရည်ညွှန်းတဲ့အခါ 'ကျွန်တော်' ဆိုတဲ့ စကားလုံးကိုပဲ သုံးပါ။ သင့်ရဲ့အဖြေတွေမှာ ဘယ်လိုလင့်ခ်မျိုးမှ မထည့်ပါနဲ့။ တရုတ်စာလုံး၊ ဂျပန်စာလုံး၊ အခြားဘာသာစကားတွေကို လုံးဝမသုံးပါနဲ့။"},
+                {"role": "system", "content": "သင်ဟာ ယဉ်ကျေးပြီး အကူအညီပေးတတ်တဲ့ လက်ထောက်တစ်ယောက်ပါ။ မြန်မာလိုပဲ ဖြေပါ။ သင့်ကိုယ်သင် ရည်ညွှန်းတဲ့အခါ 'ကျွန်တော်' ဆိုတဲ့ စကားလုံးကိုပဲ သုံးပါ။ သင့်ရဲ့အဖြေတွေမှာ ဘယ်လိုလင့်ခ်မျိုးမှ မထည့်ပါနဲ့။"},
                 {"role": "user", "content": user_message}
             ],
             "max_tokens": 500,
@@ -108,57 +108,14 @@ def handle_message(update: Update, context: CallbackContext):
 
         if "choices" in response_data:
             reply = response_data["choices"][0]["message"]["content"].strip()
-            def clean_reply(text):
-    # လင့်ခ်အကုန်ဖယ်
-    text = re.sub(r'https?://\S+', '', text)
-    text = re.sub(r't\.me/\S+', '', text)
-    text = re.sub(r'www\.\S+', '', text)
-    
-    # ကြော်ငြာစာသားတွေကို ဖယ်
-    text = re.sub(r'To use this bot, you must join our channel:.*', '', text, flags=re.DOTALL)
-    text = re.sub(r'VIEW CHANNEL.*', '', text, flags=re.DOTALL)
-    text = re.sub(r'Telegram\s+A-TOOLS X.*', '', text, flags=re.DOTALL)
-    text = re.sub(r'A-TOOLS X.*', '', text, flags=re.DOTALL)
-    text = re.sub(r'Programming & Development.*', '', text, flags=re.DOTALL)
-    
-    # မလိုအပ်တဲ့ စာကြောင်းတွေကို ဖယ်
-    lines = text.split('\n')
-    clean_lines = []
-    for line in lines:
-        if 't.me' not in line and 'A-TOOLS' not in line and 'VIEW CHANNEL' not in line:
-            clean_lines.append(line)
-    text = '\n'.join(clean_lines)
-    
-    # နေရာလွတ်တွေကို သန့်ရှင်းအောင်လုပ်
-    text = re.sub(r'\s+', ' ', text)
-    return text.strip()
             
-            # ====== လင့်ခ်အကုန်ဖယ်ရှားမယ် (ပိုပြီးပြည့်စုံအောင်) ======
-            # t.me လင့်ခ်
-            reply = re.sub(r'https?://t\.me/\S+', '', reply)
+            # ====== လင့်ခ်တွေကို ဖယ်ရှားမယ် ======
+            reply = re.sub(r'https?://\S+', '', reply)
             reply = re.sub(r't\.me/\S+', '', reply)
-            # http/https လင့်ခ်
-            reply = re.sub(r'http[s]?://\S+', '', reply)
-            # www လင့်ခ်
             reply = re.sub(r'www\.\S+', '', reply)
-            # Markdown လင့်ခ်
             reply = re.sub(r'\[.*?\]\(.*?\)', '', reply)
-            # Telegram လင့်ခ်ပုံစံအကုန်
-            reply = re.sub(r'@\w+', '', reply)  # @username
-            reply = re.sub(r'#\w+', '', reply)  # hashtag
-            
-            # ====== တရုတ်/ဂျပန်/ကိုရီးယားစာလုံးတွေကို ဖယ်ရှားမယ် ======
-            reply = re.sub(r'[\u4e00-\u9fff]+', '', reply)
-            reply = re.sub(r'[\u3040-\u30ff\u31f0-\u31ff]+', '', reply)
-            reply = re.sub(r'[\uac00-\ud7af]+', '', reply)
-            
-            # ====== နေရာလွတ်တွေကို သန့်ရှင်းအောင်လုပ်မယ် ======
             reply = re.sub(r'\s+', ' ', reply)
             reply = reply.strip()
-            
-            # အဖြေဗလာဖြစ်နေရင် ပုံမှန်စာသားပြန်ပို့မယ်
-            if not reply:
-                reply = "ကျွန်တော် နားလည်ပါတယ်။ ဒါပေမယ့် အခုအချိန်မှာ အဖြေရှာမရသေးပါဘူး။"
             
             if len(reply) > 4000:
                 reply = reply[:4000] + "..."
