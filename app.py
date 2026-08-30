@@ -12,7 +12,8 @@ GROQ_API_KEY = "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"  # သ
 
 # ====== Groq Settings ======
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-MODEL = "llama3-70b-8192"  # ဒါမှမဟုတ် "mixtral-8x7b-32768"
+# အမြန်ဆုံး မော်ဒယ်
+MODEL = "llama-3.1-8b-instant" # ဒါမှမဟုတ် "mixtral-8x7b-32768"
 
 # ====== Flask ======
 flask_app = Flask(__name__)
