@@ -76,6 +76,7 @@ def auto_reply(update: Update, context: CallbackContext):
 
 # ====== AI စကားပြော ======
 # ====== AI စကားပြော ======
+# ====== AI စကားပြော ======
 def handle_message(update: Update, context: CallbackContext):
     user_message = update.message.text
 
@@ -93,7 +94,7 @@ def handle_message(update: Update, context: CallbackContext):
         data = {
             "model": MODEL,
             "messages": [
-                {"role": "system", "content": "သင်ဟာ ယဉ်ကျေးပြီး အကူအညီပေးတတ်တဲ့ လက်ထောက်တစ်ယောက်ပါ။ မြန်မာလိုပဲ ဖြေပါ။ သင့်ကိုယ်သင် ရည်ညွှန်းတဲ့အခါ 'ကျွန်တော်' ဆိုတဲ့ စကားလုံးကိုပဲ သုံးပါ။ 'ကျွန်မ' လို့ မသုံးပါနဲ့။ သင့်ရဲ့အဖြေတွေမှာ ဘယ်လိုလင့်ခ်မျိုးမှ မထည့်ပါနဲ့။ Telegram လင့်ခ်တွေ၊ ဝဘ်ဆိုက်လင့်ခ်တွေ လုံးဝမပါစေနဲ့။"},
+                {"role": "system", "content": "သင်ဟာ ယဉ်ကျေးပြီး အကူအညီပေးတတ်တဲ့ လက်ထောက်တစ်ယောက်ပါ။ မြန်မာလိုပဲ ဖြေပါ။ သင့်ကိုယ်သင် ရည်ညွှန်းတဲ့အခါ 'ကျွန်တော်' ဆိုတဲ့ စကားလုံးကိုပဲ သုံးပါ။ သင့်ရဲ့အဖြေတွေမှာ တရုတ်စာလုံး၊ ဂျပန်စာလုံး၊ အခြားဘာသာစကားတွေကို လုံးဝမသုံးပါနဲ့။ မြန်မာစာလုံးနဲ့ အင်္ဂလိပ်စာလုံးတွေကိုပဲ သုံးပါ။"},
                 {"role": "user", "content": user_message}
             ],
             "max_tokens": 500,
@@ -112,6 +113,13 @@ def handle_message(update: Update, context: CallbackContext):
             reply = re.sub(r'http[s]?://\S+', '', reply)
             reply = re.sub(r'www\.\S+', '', reply)
             reply = re.sub(r'\[.*?\]\(.*?\)', '', reply)
+            
+            # ====== တရုတ်/ဂျပန်/ကိုရီးယားစာလုံးတွေကို ဖယ်ရှားမယ် ======
+            reply = re.sub(r'[\u4e00-\u9fff]+', '', reply)  # တရုတ်
+            reply = re.sub(r'[\u3040-\u30ff\u31f0-\u31ff]+', '', reply)  # ဂျပန်
+            reply = re.sub(r'[\uac00-\ud7af]+', '', reply)  # ကိုရီးယား
+            
+            # ====== နေရာလွတ်တွေကို သန့်ရှင်းအောင်လုပ်မယ် ======
             reply = re.sub(r'\s+', ' ', reply)
             reply = reply.strip()
             
