@@ -1,3 +1,8 @@
+def run_bot():
+    print(">>> run_bot() is called!")  # ← ဒီစာကြောင်း ထပ်ထည့်ပါ
+    print("🤖 ဘော့စတင်နေပါပြီ...")
+    
+    # ... ကျန်တာတွေ ...
 import os
 import threading
 import re
