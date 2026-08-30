@@ -8,7 +8,7 @@ from huggingface_hub import InferenceClient
 
 # ====== API Keys ======
 TELEGRAM_BOT_TOKEN = "8617869426:AAHSSyjxzn6Jd_NfOqseGM82ZoCo1EGGbNE"
-HF_TOKEN = "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"
+HF_TOKEN = "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"
 
 # ====== Hugging Face Settings ======
 client = InferenceClient(token=HF_TOKEN)
