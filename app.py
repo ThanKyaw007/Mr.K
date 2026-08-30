@@ -5,15 +5,15 @@ import requests
 from flask import Flask
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from google import genai
+from huggingface_hub import InferenceClient
 
 # ====== API Keys ======
 TELEGRAM_BOT_TOKEN = "8617869426:AAHSSyjxzn6Jd_NfOqseGM82ZoCo1EGGbNE"
-GEMINI_API_KEY = "AIzaSy..."  # သင့် Gemini API Key ကို ထည့်ပါ
+HF_TOKEN = "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"  # သင့် Hugging Face Token ကို ထည့်ပါ
 
-# ====== Gemini Settings ======
-client = genai.Client(api_key=GEMINI_API_KEY)
-MODEL = "gemini-2.5-flash"
+# ====== Hugging Face Settings ======
+hf_client = InferenceClient(token=HF_TOKEN)
+HF_MODEL = "microsoft/DialoGPT-medium"  # ဒီမော်ဒယ်ကို ပြောင်းလို့ရပါတယ်
 
 # ====== Flask ======
 flask_app = Flask(__name__)
@@ -87,7 +87,7 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text and "ကျေးဇူး" in text:
         await update.message.reply_text("ရပါတယ်။ ကြိုဆိုပါတယ်။")
 
-# ====== AI စကားပြော (Gemini) ======
+# ====== AI စကားပြော (Hugging Face) ======
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
 
@@ -98,11 +98,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
 
     try:
-        response = client.models.generate_content(
-            model=MODEL,
-            contents=user_message
+        response = hf_client.text_generation(
+            model=HF_MODEL,
+            prompt=user_message,
+            max_new_tokens=200,
+            temperature=0.7
         )
-        reply = response.text
+        reply = response
         reply = clean_text(reply)
         
         if len(reply) > 4000:
