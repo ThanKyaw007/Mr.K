@@ -108,6 +108,30 @@ def handle_message(update: Update, context: CallbackContext):
 
         if "choices" in response_data:
             reply = response_data["choices"][0]["message"]["content"].strip()
+            def clean_reply(text):
+    # လင့်ခ်အကုန်ဖယ်
+    text = re.sub(r'https?://\S+', '', text)
+    text = re.sub(r't\.me/\S+', '', text)
+    text = re.sub(r'www\.\S+', '', text)
+    
+    # ကြော်ငြာစာသားတွေကို ဖယ်
+    text = re.sub(r'To use this bot, you must join our channel:.*', '', text, flags=re.DOTALL)
+    text = re.sub(r'VIEW CHANNEL.*', '', text, flags=re.DOTALL)
+    text = re.sub(r'Telegram\s+A-TOOLS X.*', '', text, flags=re.DOTALL)
+    text = re.sub(r'A-TOOLS X.*', '', text, flags=re.DOTALL)
+    text = re.sub(r'Programming & Development.*', '', text, flags=re.DOTALL)
+    
+    # မလိုအပ်တဲ့ စာကြောင်းတွေကို ဖယ်
+    lines = text.split('\n')
+    clean_lines = []
+    for line in lines:
+        if 't.me' not in line and 'A-TOOLS' not in line and 'VIEW CHANNEL' not in line:
+            clean_lines.append(line)
+    text = '\n'.join(clean_lines)
+    
+    # နေရာလွတ်တွေကို သန့်ရှင်းအောင်လုပ်
+    text = re.sub(r'\s+', ' ', text)
+    return text.strip()
             
             # ====== လင့်ခ်အကုန်ဖယ်ရှားမယ် (ပိုပြီးပြည့်စုံအောင်) ======
             # t.me လင့်ခ်
