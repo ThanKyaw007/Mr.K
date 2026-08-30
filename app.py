@@ -5,14 +5,15 @@ import requests
 from flask import Flask
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from google import genai
 
 # ====== API Keys ======
 TELEGRAM_BOT_TOKEN = "8617869426:AAHSSyjxzn6Jd_NfOqseGM82ZoCo1EGGbNE"
-GROQ_API_KEY = "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"
+GEMINI_API_KEY = "AQ.Ab8RN6K1YM_LneLp_lX5R7YyPa1RgBu9bR_1JzKa-q_WyocMug"  # သင့် Gemini API Key ကို ထည့်ပါ
 
-# ====== Groq Settings ======
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-MODEL = "openai/gpt-oss-120b"
+# ====== Gemini Settings ======
+client = genai.Client(api_key=GEMINI_API_KEY)
+MODEL = "gemini-2.5-flash"
 
 # ====== Flask ======
 flask_app = Flask(__name__)
@@ -24,6 +25,27 @@ def home():
 @flask_app.route('/health')
 def health():
     return "OK", 200
+
+# ====== လင့်ခ်နဲ့ ကြော်ငြာတွေကို ဖယ်ရှားတဲ့ Function ======
+def clean_text(text):
+    # လင့်ခ်အကုန်ဖယ်
+    text = re.sub(r'https?://\S+', '', text)
+    text = re.sub(r't\.me/\S+', '', text)
+    text = re.sub(r'www\.\S+', '', text)
+    text = re.sub(r'\[.*?\]\(.*?\)', '', text)
+    
+    # မလိုအပ်တဲ့ စာကြောင်းတွေကို ဖယ်
+    lines = text.split('\n')
+    clean_lines = []
+    for line in lines:
+        if 't.me' not in line and 'A-TOOLS' not in line and 'VIEW CHANNEL' not in line:
+            if line.strip():
+                clean_lines.append(line)
+    text = '\n'.join(clean_lines)
+    
+    # နေရာလွတ်တွေကို သန့်ရှင်းအောင်လုပ်
+    text = re.sub(r'\s+', ' ', text)
+    return text.strip()
 
 # ====== /start ======
 def start(update: Update, context: CallbackContext):
@@ -70,7 +92,7 @@ def auto_reply(update: Update, context: CallbackContext):
     if text and "ကျေးဇူး" in text:
         update.message.reply_text("ရပါတယ်။ ကြိုဆိုပါတယ်။")
 
-# ====== AI စကားပြော ======
+# ====== AI စကားပြော (Gemini) ======
 def handle_message(update: Update, context: CallbackContext):
     user_message = update.message.text
 
@@ -81,44 +103,26 @@ def handle_message(update: Update, context: CallbackContext):
     update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
 
     try:
-        headers = {
-            "Authorization": f"Bearer {GROQ_API_KEY}",
-            "Content-Type": "application/json"
-        }
-        data = {
-            "model": MODEL,
-            "messages": [
-                {"role": "system", "content": "သင်ဟာ ယဉ်ကျေးပြီး အကူအညီပေးတတ်တဲ့ လက်ထောက်တစ်ယောက်ပါ။ မြန်မာလိုပဲ ဖြေပါ။ သင့်ကိုယ်သင် ရည်ညွှန်းတဲ့အခါ 'ကျွန်တော်' ဆိုတဲ့ စကားလုံးကိုပဲ သုံးပါ။ သင့်ရဲ့အဖြေတွေမှာ ဘယ်လိုလင့်ခ်မျိုးမှ မထည့်ပါနဲ့။"},
-                {"role": "user", "content": user_message}
-            ],
-            "max_tokens": 500,
-            "temperature": 0.7
-        }
-
-        response = requests.post(GROQ_URL, headers=headers, json=data)
-        response_data = response.json()
-
-        if "choices" in response_data:
-            reply = response_data["choices"][0]["message"]["content"].strip()
-            
-            # ====== လင့်ခ်တွေကို ဖယ်ရှားမယ် ======
-            reply = re.sub(r'https?://\S+', '', reply)
-            reply = re.sub(r't\.me/\S+', '', reply)
-            reply = re.sub(r'www\.\S+', '', reply)
-            reply = re.sub(r'\[.*?\]\(.*?\)', '', reply)
-            reply = re.sub(r'\s+', ' ', reply)
-            reply = reply.strip()
-            
-            if len(reply) > 4000:
-                reply = reply[:4000] + "..."
-            update.message.reply_text(reply)
-        else:
-            error_msg = response_data.get("error", {}).get("message", "Unknown error")
-            update.message.reply_text(f"😅 {error_msg}")
-
+        response = client.models.generate_content(
+            model=MODEL,
+            contents=user_message
+        )
+        reply = response.text
+        
+        # ====== လင့်ခ်နဲ့ မလိုအပ်တဲ့စာသားတွေကို ဖယ်ရှားမယ် ======
+        reply = clean_text(reply)
+        
+        if len(reply) > 4000:
+            reply = reply[:4000] + "..."
+        
+        # အဖြေဗလာဖြစ်နေရင် ပုံမှန်စာသားပြန်ပို့မယ်
+        if not reply:
+            reply = "ကျွန်တော် နားလည်ပါတယ်။ ဒါပေမယ့် အခုအချိန်မှာ အဖြေရှာမရသေးပါဘူး။"
+        
+        update.message.reply_text(reply)
+        
     except Exception as e:
-        clean_error = re.sub(r'http\S+|https\S+', '', str(e))
-        update.message.reply_text(f"😅 အားနည်းချက်ရှိလို့ ပြန်မဖြေနိုင်ဘူး။ နောက်မှ ပြန်ကြည့်ပါ။")
+        update.message.reply_text(f"😅 Error: {str(e)[:100]}")
 
 # ====== run_bot ======
 def run_bot():
