@@ -15,7 +15,8 @@ GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 # အမြန်ဆုံး မော်ဒယ်
 # ပေါ့ပါးပြီး မြန်ဆန်တယ်
 # အကောင်းဆုံး ရွေးချယ်မှု (အကြံပြုထားတယ်)
-MODEL = "llama-3.3-70b-versatile"
+# တတိယ ဒါကို စမ်းကြည့်ပါ (ယေဘုယျသုံးမော်ဒယ်)
+MODEL = "groq/compound"
 # ====== Flask ======
 flask_app = Flask(__name__)
 
