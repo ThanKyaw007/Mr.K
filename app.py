@@ -12,7 +12,7 @@ HF_TOKEN = "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"
 
 # ====== Hugging Face Settings ======
 client = InferenceClient(token=HF_TOKEN)
-MODEL = "google/gemma-2b-it"  # Google မော်ဒယ်
+MODEL = "Qwen/Qwen2.5-0.5B"  # သေးငယ်ပြီး မြန်ဆန်တယ်
 
 # ====== Flask ======
 flask_app = Flask(__name__)
