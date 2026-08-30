@@ -3,8 +3,8 @@ import threading
 import re
 import requests
 from flask import Flask
-from telegram import Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackContext
+from telegram.ext import filters
 from google import genai
 
 # ====== API Keys ======
