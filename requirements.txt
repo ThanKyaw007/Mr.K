@@ -1,4 +1,4 @@
 Flask
 python-telegram-bot==20.0
-huggingface-hub
+huggingface_hub
 requests
