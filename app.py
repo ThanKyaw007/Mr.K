@@ -14,7 +14,7 @@ HF_TOKEN = "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"
 client = InferenceClient(token=HF_TOKEN)
 # ရွေးချယ်စရာ ၂ (အရည်အသွေးအကောင်းဆုံး)
 # ရွေးချယ်စရာ ၃ (ပေါ့ပါးပြီး မြန်ဆန်)
-MODEL = "meta-llama/llama-3.2-3b-instruct:free"
+MODEL = "meta-llama/llama-3.2-3b-instruct"
 
 # ====== Flask ======
 flask_app = Flask(__name__)
