@@ -1,18 +1,13 @@
-def run_bot():
-    print(">>> run_bot() is called!")  # ← ဒီစာကြောင်း ထပ်ထည့်ပါ
-    print("🤖 ဘော့စတင်နေပါပြီ...")
-    
-    # ... ကျန်တာတွေ ...
 import os
 import threading
 import re
 import requests
 from flask import Flask
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
-# ====== API Keys (Render Environment ကနေ ယူမယ်) ======
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+# ====== API Keys ======
+TELEGRAM_BOT_TOKEN = "8617869426:AAHSSyjxzn6Jd_NfOqseGM82ZoCo1EGGbNE"
 OPENROUTER_API_KEY = "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"
 
 # ====== OpenRouter Settings ======
@@ -31,24 +26,24 @@ def health():
     return "OK", 200
 
 # ====== /start ======
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
+def start(update: Update, context: CallbackContext):
+    update.message.reply_text(
         "🙏 မင်္ဂလာပါ။ ကျွန်တော် သင့်အတွက် အကူအညီပေးနိုင်တဲ့ လက်ထောက်တစ်ယောက်ပါ။\n\n"
         "ဘာမေးခွန်းမဆို မြန်မာလိုပဲ ရိုးရိုးရှင်းရှင်း မေးလိုက်ပါ။\n"
         "ကျွန်တော် သဘာဝအတိုင်း ပြန်ဖြေပေးပါ့မယ်။"
     )
 
 # ====== handle_message ======
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def handle_message(update: Update, context: CallbackContext):
     user_message = update.message.text
-    await update.message.reply_text(f"မင်းပြောတာ: {user_message}")
-    
+
+    # နှုတ်ဆက်စကားတွေအတွက်
     if any(word in user_message.lower() for word in ["ဟိုင်း", "မင်္ဂလာ", "hello", "hi"]):
-        await update.message.reply_text("မင်္ဂလာပါ။ ကျွန်တော် ဒီမှာရှိပါတယ်။ သိချင်တာမေးပါနော်။")
+        update.message.reply_text("မင်္ဂလာပါ။ ကျွန်တော် ဒီမှာရှိပါတယ်။ သိချင်တာမေးပါနော်။")
         return
-    
-    await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
-    
+
+    update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
+
     try:
         headers = {
             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -63,39 +58,41 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "max_tokens": 500,
             "temperature": 0.7
         }
-        
+
         response = requests.post(OPENROUTER_URL, headers=headers, json=data)
         response_data = response.json()
-        
+
         if "choices" in response_data:
             reply = response_data["choices"][0]["message"]["content"].strip()
             reply = re.sub(r'http\S+|https\S+', '', reply)
             if len(reply) > 4000:
                 reply = reply[:4000] + "..."
-            await update.message.reply_text(reply)
+            update.message.reply_text(reply)
         else:
             error_msg = response_data.get("error", {}).get("message", "Unknown error")
-            await update.message.reply_text(f"😅 {error_msg}")
-            
+            update.message.reply_text(f"😅 {error_msg}")
+
     except Exception as e:
         clean_error = re.sub(r'http\S+|https\S+', '', str(e))
-        await update.message.reply_text(f"😅 အားနည်းချက်ရှိလို့ ပြန်မဖြေနိုင်ဘူး။ နောက်မှ ပြန်ကြည့်ပါ။")
+        update.message.reply_text(f"😅 အားနည်းချက်ရှိလို့ ပြန်မဖြေနိုင်ဘူး။ နောက်မှ ပြန်ကြည့်ပါ။")
 
 # ====== run_bot ======
 def run_bot():
     print("🤖 ဘော့စတင်နေပါပြီ...")
-    
+
     if not TELEGRAM_BOT_TOKEN:
-        print("❌ TELEGRAM_BOT_TOKEN မရှိပါ! Environment Variables ကို စစ်ပါ။")
+        print("❌ TELEGRAM_BOT_TOKEN မရှိပါ!")
         return
-    
-    app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    
+
+    updater = Updater(TELEGRAM_BOT_TOKEN, use_context=True)
+    dp = updater.dispatcher
+
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+
     print("✅ ဘော့ အဆင်သင့်ဖြစ်ပါပြီ!")
-    print("⏳ Polling စတင်နေပါပြီ...")  #
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    updater.start_polling()
+    updater.idle()
 
 # ====== အဓိကအပိုင်း ======
 if __name__ == "__main__":
