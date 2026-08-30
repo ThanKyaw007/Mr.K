@@ -75,6 +75,7 @@ def auto_reply(update: Update, context: CallbackContext):
         update.message.reply_text("ရပါတယ်။ ကြိုဆိုပါတယ်။")
 
 # ====== AI စကားပြော ======
+# ====== AI စကားပြော ======
 def handle_message(update: Update, context: CallbackContext):
     user_message = update.message.text
 
@@ -92,7 +93,7 @@ def handle_message(update: Update, context: CallbackContext):
         data = {
             "model": MODEL,
             "messages": [
-                {"role": "system", "content": "သင်ဟာ ယဉ်ကျေးပြီး အကူအညီပေးတတ်တဲ့ လက်ထောက်တစ်ယောက်ပါ။ မြန်မာလိုပဲ ဖြေပါ။ သင့်ရဲ့အဖြေတွေမှာ ဘယ်လိုလင့်ခ်မျိုးမှ မထည့်ပါနဲ့။ Telegram လင့်ခ်တွေ၊ ဝဘ်ဆိုက်လင့်ခ်တွေ လုံးဝမပါစေနဲ့။"},
+                {"role": "system", "content": "သင်ဟာ ယဉ်ကျေးပြီး အကူအညီပေးတတ်တဲ့ လက်ထောက်တစ်ယောက်ပါ။ မြန်မာလိုပဲ ဖြေပါ။ သင့်ကိုယ်သင် ရည်ညွှန်းတဲ့အခါ 'ကျွန်တော်' ဆိုတဲ့ စကားလုံးကိုပဲ သုံးပါ။ 'ကျွန်မ' လို့ မသုံးပါနဲ့။ သင့်ရဲ့အဖြေတွေမှာ ဘယ်လိုလင့်ခ်မျိုးမှ မထည့်ပါနဲ့။ Telegram လင့်ခ်တွေ၊ ဝဘ်ဆိုက်လင့်ခ်တွေ လုံးဝမပါစေနဲ့။"},
                 {"role": "user", "content": user_message}
             ],
             "max_tokens": 500,
@@ -124,7 +125,6 @@ def handle_message(update: Update, context: CallbackContext):
     except Exception as e:
         clean_error = re.sub(r'http\S+|https\S+', '', str(e))
         update.message.reply_text(f"😅 အားနည်းချက်ရှိလို့ ပြန်မဖြေနိုင်ဘူး။ နောက်မှ ပြန်ကြည့်ပါ။")
-
 # ====== run_bot ======
 def run_bot():
     print("🤖 ဘော့စတင်နေပါပြီ...")
