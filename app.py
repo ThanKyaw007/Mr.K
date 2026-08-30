@@ -34,6 +34,7 @@ def start(update: Update, context: CallbackContext):
     )
 
 # ====== handle_message ======
+# ====== handle_message ======
 def handle_message(update: Update, context: CallbackContext):
     user_message = update.message.text
 
@@ -50,7 +51,7 @@ def handle_message(update: Update, context: CallbackContext):
             "Content-Type": "application/json"
         }
         data = {
-            "model": MODEL,
+            "model": "google/gemma-3-27b-it:free",  # ဒါမှမဟုတ် openrouter/free
             "messages": [
                 {"role": "system", "content": "သင်ဟာ ယဉ်ကျေးပြီး အကူအညီပေးတတ်တဲ့ လက်ထောက်တစ်ယောက်ပါ။ မြန်မာလိုပဲ ဖြေပါ။ မေးခွန်းတွေကို သဘာဝကျကျ၊ ရိုးရိုးသားသား ဖြေကြားပါ။"},
                 {"role": "user", "content": user_message}
@@ -75,7 +76,6 @@ def handle_message(update: Update, context: CallbackContext):
     except Exception as e:
         clean_error = re.sub(r'http\S+|https\S+', '', str(e))
         update.message.reply_text(f"😅 အားနည်းချက်ရှိလို့ ပြန်မဖြေနိုင်ဘူး။ နောက်မှ ပြန်ကြည့်ပါ။")
-
 # ====== run_bot ======
 def run_bot():
     print("🤖 ဘော့စတင်နေပါပြီ...")
