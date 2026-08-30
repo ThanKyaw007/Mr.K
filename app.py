@@ -16,7 +16,7 @@ GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 # ပေါ့ပါးပြီး မြန်ဆန်တယ်
 # အကောင်းဆုံး ရွေးချယ်မှု (အကြံပြုထားတယ်)
 # တတိယ ဒါကို စမ်းကြည့်ပါ (ယေဘုယျသုံးမော်ဒယ်)
-MODEL = "groq/compound"
+MODEL = "mixtral-8x7b-32768" 
 # ====== Flask ======
 flask_app = Flask(__name__)
 
@@ -37,6 +37,7 @@ def start(update: Update, context: CallbackContext):
     )
 
 # ====== handle_message ======
+# ====== handle_message ======
 def handle_message(update: Update, context: CallbackContext):
     user_message = update.message.text
 
@@ -54,7 +55,7 @@ def handle_message(update: Update, context: CallbackContext):
         data = {
             "model": MODEL,
             "messages": [
-                {"role": "system", "content": "သင်ဟာ ယဉ်ကျေးပြီး အကူအညီပေးတတ်တဲ့ လက်ထောက်တစ်ယောက်ပါ။ မြန်မာလိုပဲ ဖြေပါ။"},
+                {"role": "system", "content": "သင်ဟာ ယဉ်ကျေးပြီး အကူအညီပေးတတ်တဲ့ လက်ထောက်တစ်ယောက်ပါ။ မြန်မာလိုပဲ ဖြေပါ။ အဖြေတွေကို သဘာဝကျကျ၊ ရိုးရိုးသားသား ဖြေကြားပါ။"},
                 {"role": "user", "content": user_message}
             ],
             "max_tokens": 500,
@@ -66,7 +67,19 @@ def handle_message(update: Update, context: CallbackContext):
 
         if "choices" in response_data:
             reply = response_data["choices"][0]["message"]["content"].strip()
-            reply = re.sub(r'http\S+|https\S+', '', reply)
+            
+            # ====== လင့်ခ်တွေကို ပြည့်ပြည့်စုံစုံ ဖယ်ရှားမယ် ======
+            import re
+            reply = re.sub(r'http[s]?://\S+', '', reply)      # http/https လင့်ခ်
+            reply = re.sub(r'www\.\S+', '', reply)            # www လင့်ခ်
+            reply = re.sub(r'\[.*?\]\(.*?\)', '', reply)      # Markdown လင့်ခ်
+            reply = re.sub(r't\.me/\S+', '', reply)           # t.me လင့်ခ်
+            reply = re.sub(r'https?://t\.me/\S+', '', reply)  # https://t.me လင့်ခ်
+            
+            # လင့်ခ်တွေကို ဖယ်လိုက်တဲ့အခါ နေရာလွတ်တွေ ကျန်နေရင် သန့်ရှင်းအောင်လုပ်မယ်
+            reply = re.sub(r'\s+', ' ', reply)                # နေရာလွတ်များစွာကို တစ်ခုတည်းဖြစ်အောင်
+            reply = reply.strip()                             # အစနဲ့အဆုံးက နေရာလွတ်တွေဖယ်
+            
             if len(reply) > 4000:
                 reply = reply[:4000] + "..."
             update.message.reply_text(reply)
@@ -77,7 +90,6 @@ def handle_message(update: Update, context: CallbackContext):
     except Exception as e:
         clean_error = re.sub(r'http\S+|https\S+', '', str(e))
         update.message.reply_text(f"😅 အားနည်းချက်ရှိလို့ ပြန်မဖြေနိုင်ဘူး။ နောက်မှ ပြန်ကြည့်ပါ။")
-
 # ====== run_bot ======
 def run_bot():
     print("🤖 ဘော့စတင်နေပါပြီ...")
