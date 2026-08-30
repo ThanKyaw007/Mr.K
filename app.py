@@ -1,17 +1,18 @@
 import os
 import threading
 import re
+import requests
 from flask import Flask
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from google import genai
 
 # ====== API Keys ======
 TELEGRAM_BOT_TOKEN = "8617869426:AAHSSyjxzn6Jd_NfOqseGM82ZoCo1EGGbNE"
-GEMINI_API_KEY = "AQ.Ab8RN6JNPSlYVtln-KFetsinQSrJW_XAZhXJ5HDxHWiRj7tXgQ"
+OPENROUTER_API_KEY = "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"
 
-# ====== Gemini Client ======
-client = genai.Client(api_key=GEMINI_API_KEY)
+# ====== OpenRouter Settings ======
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+MODEL = "openai/gpt-3.5-turbo:free"  # အခမဲ့မော်ဒယ်
 
 # ====== Flask ======
 flask_app = Flask(__name__)
@@ -44,30 +45,37 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
     
     try:
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=user_message
-        )
-        reply = response.text
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        data = {
+            "model": MODEL,
+            "messages": [
+                {"role": "system", "content": "သင်ဟာ ယဉ်ကျေးပြီး အကူအညီပေးတတ်တဲ့ လက်ထောက်တစ်ယောက်ပါ။ မြန်မာလိုပဲ ဖြေပါ။ မေးခွန်းတွေကို သဘာဝကျကျ၊ ရိုးရိုးသားသား ဖြေကြားပါ။"},
+                {"role": "user", "content": user_message}
+            ],
+            "max_tokens": 500,
+            "temperature": 0.7
+        }
         
-        # လင့်ခ်တွေကို ဖယ်ရှားမယ်
-        reply = re.sub(r'http\S+|https\S+', '', reply)
+        response = requests.post(OPENROUTER_URL, headers=headers, json=data)
+        response_data = response.json()
         
-        if len(reply) > 4000:
-            reply = reply[:4000] + "..."
-        await update.message.reply_text(reply)
-        
-    except Exception as e:
-        # Error ကို ရိုးရိုးရှင်းရှင်း ပြန်ဖြေမယ် (လင့်ခ်မပါဘူး)
-        error_msg = str(e)
-        if "401" in error_msg or "UNAUTHENTICATED" in error_msg:
-            await update.message.reply_text("😅 API Key မှားနေတယ်။ ကျေးဇူးပြုပြီး ပြန်စစ်ပါ။")
-        elif "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
-            await update.message.reply_text("😅 တစ်နေ့တာ မေးခွန်းအရေအတွက် ပြည့်သွားပြီ။ နောက်နေ့မှ ပြန်မေးပါ။")
+        if "choices" in response_data:
+            reply = response_data["choices"][0]["message"]["content"].strip()
+            # လင့်ခ်တွေကို ဖယ်ရှားမယ်
+            reply = re.sub(r'http\S+|https\S+', '', reply)
+            if len(reply) > 4000:
+                reply = reply[:4000] + "..."
+            await update.message.reply_text(reply)
         else:
-            # လင့်ခ်တွေကို ဖယ်ရှားပြီး ရိုးရိုးရှင်းရှင်း ပြန်ဖြေမယ်
-            clean_error = re.sub(r'http\S+|https\S+', '', str(e))
-            await update.message.reply_text(f"😅 အားနည်းချက်ရှိလို့ ပြန်မဖြေနိုင်ဘူး။ နောက်မှ ပြန်ကြည့်ပါ။")
+            error_msg = response_data.get("error", {}).get("message", "Unknown error")
+            await update.message.reply_text(f"😅 {error_msg}")
+            
+    except Exception as e:
+        clean_error = re.sub(r'http\S+|https\S+', '', str(e))
+        await update.message.reply_text(f"😅 အားနည်းချက်ရှိလို့ ပြန်မဖြေနိုင်ဘူး။ နောက်မှ ပြန်ကြည့်ပါ။")
 
 # ====== run_bot ======
 def run_bot():
