@@ -14,8 +14,8 @@ GROQ_API_KEY = "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"  # သ
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 # အမြန်ဆုံး မော်ဒယ်
 # ပေါ့ပါးပြီး မြန်ဆန်တယ်
-MODEL = "gemma2-9b-it"
-
+# အကောင်းဆုံး ရွေးချယ်မှု (အကြံပြုထားတယ်)
+MODEL = "llama-3.3-70b-versatile"
 # ====== Flask ======
 flask_app = Flask(__name__)
 
