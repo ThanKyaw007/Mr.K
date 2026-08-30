@@ -8,11 +8,11 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 
 # ====== API Keys ======
 TELEGRAM_BOT_TOKEN = "8617869426:AAHSSyjxzn6Jd_NfOqseGM82ZoCo1EGGbNE"
-OPENROUTER_API_KEY = "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"
+GROQ_API_KEY = "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"  # သင့် Groq API Key ကို ထည့်ပါ
 
-# ====== OpenRouter Settings ======
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL = "openrouter/free"
+# ====== Groq Settings ======
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+MODEL = "llama3-70b-8192"  # ဒါမှမဟုတ် "mixtral-8x7b-32768"
 
 # ====== Flask ======
 flask_app = Flask(__name__)
@@ -34,11 +34,9 @@ def start(update: Update, context: CallbackContext):
     )
 
 # ====== handle_message ======
-# ====== handle_message ======
 def handle_message(update: Update, context: CallbackContext):
     user_message = update.message.text
 
-    # နှုတ်ဆက်စကားတွေအတွက်
     if any(word in user_message.lower() for word in ["ဟိုင်း", "မင်္ဂလာ", "hello", "hi"]):
         update.message.reply_text("မင်္ဂလာပါ။ ကျွန်တော် ဒီမှာရှိပါတယ်။ သိချင်တာမေးပါနော်။")
         return
@@ -47,20 +45,20 @@ def handle_message(update: Update, context: CallbackContext):
 
     try:
         headers = {
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Authorization": f"Bearer {GROQ_API_KEY}",
             "Content-Type": "application/json"
         }
         data = {
-            "model": "google/gemma-3-27b-it:free",  # ဒါမှမဟုတ် openrouter/free
+            "model": MODEL,
             "messages": [
-                {"role": "system", "content": "သင်ဟာ ယဉ်ကျေးပြီး အကူအညီပေးတတ်တဲ့ လက်ထောက်တစ်ယောက်ပါ။ မြန်မာလိုပဲ ဖြေပါ။ မေးခွန်းတွေကို သဘာဝကျကျ၊ ရိုးရိုးသားသား ဖြေကြားပါ။"},
+                {"role": "system", "content": "သင်ဟာ ယဉ်ကျေးပြီး အကူအညီပေးတတ်တဲ့ လက်ထောက်တစ်ယောက်ပါ။ မြန်မာလိုပဲ ဖြေပါ။"},
                 {"role": "user", "content": user_message}
             ],
             "max_tokens": 500,
             "temperature": 0.7
         }
 
-        response = requests.post(OPENROUTER_URL, headers=headers, json=data)
+        response = requests.post(GROQ_URL, headers=headers, json=data)
         response_data = response.json()
 
         if "choices" in response_data:
@@ -76,6 +74,7 @@ def handle_message(update: Update, context: CallbackContext):
     except Exception as e:
         clean_error = re.sub(r'http\S+|https\S+', '', str(e))
         update.message.reply_text(f"😅 အားနည်းချက်ရှိလို့ ပြန်မဖြေနိုင်ဘူး။ နောက်မှ ပြန်ကြည့်ပါ။")
+
 # ====== run_bot ======
 def run_bot():
     print("🤖 ဘော့စတင်နေပါပြီ...")
