@@ -90,6 +90,33 @@ def handle_message(update: Update, context: CallbackContext):
     except Exception as e:
         clean_error = re.sub(r'http\S+|https\S+', '', str(e))
         update.message.reply_text(f"😅 အားနည်းချက်ရှိလို့ ပြန်မဖြေနိုင်ဘူး။ နောက်မှ ပြန်ကြည့်ပါ။")
+        def ban(update: Update, context: CallbackContext):
+    """အသုံးပြုသူကို အုပ်စုကနေ ပိတ်ဆို့ရန်"""
+    if not update.message.reply_to_message:
+        update.message.reply_text("⚠️ ကျေးဇူးပြုပြီး ပိတ်ဆို့ချင်တဲ့သူရဲ့ မက်ဆေ့ချ်ကို Reply နှိပ်ပါ။")
+        return
+    user_id = update.message.reply_to_message.from_user.id
+    try:
+        update.message.bot.ban_chat_member(update.effective_chat.id, user_id)
+        update.message.reply_text(f"✅ အသုံးပြုသူကို ပိတ်ဆို့ပြီးပါပြီ။")
+    except Exception as e:
+        update.message.reply_text(f"❌ ပိတ်ဆို့လို့မရပါ။ အကြောင်းရင်း: {e}")
+        def warn(update: Update, context: CallbackContext):
+    """အသုံးပြုသူကို သတိပေးရန်"""
+    if not update.message.reply_to_message:
+        update.message.reply_text("⚠️ ကျေးဇူးပြုပြီး သတိပေးချင်တဲ့သူရဲ့ မက်ဆေ့ချ်ကို Reply နှိပ်ပါ။")
+        return
+    user = update.message.reply_to_message.from_user
+    update.message.reply_text(f"⚠️ {user.first_name} ကို သတိပေးလိုက်ပါပြီ။")
+    def welcome(update: Update, context: CallbackContext):
+    """အဖွဲ့ဝင်အသစ်ကို ကြိုဆိုရန်"""
+    for member in update.message.new_chat_members:
+        update.message.reply_text(f"👋 {member.first_name} ကို ကြိုဆိုပါတယ်!")
+        def auto_reply(update: Update, context: CallbackContext):
+    """သတ်မှတ်ထားတဲ့ စကားလုံးအတွက် အလိုအလျောက်ပြန်ကြားရန်"""
+    text = update.message.text
+    if text and "မင်္ဂလာပါ" in text:
+        update.message.reply_text("မင်္ဂလာပါ! ကျွန်တော် ဒီမှာရှိပါတယ်။")
 # ====== run_bot ======
 def run_bot():
     print("🤖 ဘော့စတင်နေပါပြီ...")
@@ -101,13 +128,19 @@ def run_bot():
     updater = Updater(TELEGRAM_BOT_TOKEN, use_context=True)
     dp = updater.dispatcher
 
+    # ====== အခြေခံ Handler တွေ ======
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+
+    # ====== အုပ်စုစီမံခန့်ခွဲရေး Handler တွေ ======
+    dp.add_handler(CommandHandler("ban", ban))
+    dp.add_handler(CommandHandler("warn", warn))
+    dp.add_handler(MessageHandler(Filters.status_update.new_chat_members, welcome))
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, auto_reply))
 
     print("✅ ဘော့ အဆင်သင့်ဖြစ်ပါပြီ!")
     updater.start_polling()
     updater.idle()
-
 # ====== အဓိကအပိုင်း ======
 if __name__ == "__main__":
     bot_thread = threading.Thread(target=run_bot)
