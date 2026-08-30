@@ -35,6 +35,7 @@ def start(update: Update, context: CallbackContext):
 
 # ====== handle_message ======
 # ====== handle_message ======
+# ====== handle_message ======
 def handle_message(update: Update, context: CallbackContext):
     user_message = update.message.text
 
@@ -52,7 +53,7 @@ def handle_message(update: Update, context: CallbackContext):
         data = {
             "model": MODEL,
             "messages": [
-                {"role": "system", "content": "သင်ဟာ ယဉ်ကျေးပြီး အကူအညီပေးတတ်တဲ့ လက်ထောက်တစ်ယောက်ပါ။ မြန်မာလိုပဲ ဖြေပါ။ အဖြေတွေကို သဘာဝကျကျ၊ ရိုးရိုးသားသား ဖြေကြားပါ။"},
+                {"role": "system", "content": "သင်ဟာ ယဉ်ကျေးပြီး အကူအညီပေးတတ်တဲ့ လက်ထောက်တစ်ယောက်ပါ။ မြန်မာလိုပဲ ဖြေပါ။ သင့်ရဲ့အဖြေတွေမှာ ဘယ်လိုလင့်ခ်မျိုးမှ မထည့်ပါနဲ့။ Telegram လင့်ခ်တွေ၊ ဝဘ်ဆိုက်လင့်ခ်တွေ လုံးဝမပါစေနဲ့။"},
                 {"role": "user", "content": user_message}
             ],
             "max_tokens": 500,
@@ -67,15 +68,16 @@ def handle_message(update: Update, context: CallbackContext):
             
             # ====== လင့်ခ်တွေကို ပြည့်ပြည့်စုံစုံ ဖယ်ရှားမယ် ======
             import re
-            reply = re.sub(r'http[s]?://\S+', '', reply)      # http/https လင့်ခ်
-            reply = re.sub(r'www\.\S+', '', reply)            # www လင့်ခ်
-            reply = re.sub(r'\[.*?\]\(.*?\)', '', reply)      # Markdown လင့်ခ်
-            reply = re.sub(r't\.me/\S+', '', reply)           # t.me လင့်ခ်
-            reply = re.sub(r'https?://t\.me/\S+', '', reply)  # https://t.me လင့်ခ်
-            
-            # လင့်ခ်တွေကို ဖယ်လိုက်တဲ့အခါ နေရာလွတ်တွေ ကျန်နေရင် သန့်ရှင်းအောင်လုပ်မယ်
-            reply = re.sub(r'\s+', ' ', reply)                # နေရာလွတ်များစွာကို တစ်ခုတည်းဖြစ်အောင်
-            reply = reply.strip()                             # အစနဲ့အဆုံးက နေရာလွတ်တွေဖယ်
+            # t.me လင့်ခ်တွေကို အတိအကျ ပစ်မှတ်ထားဖယ်ရှားမယ်
+            reply = re.sub(r'https?://t\.me/\S+', '', reply)
+            reply = re.sub(r't\.me/\S+', '', reply)
+            # အခြားလင့်ခ်တွေကိုလည်း ဖယ်ရှားမယ်
+            reply = re.sub(r'http[s]?://\S+', '', reply)
+            reply = re.sub(r'www\.\S+', '', reply)
+            reply = re.sub(r'\[.*?\]\(.*?\)', '', reply)
+            # နေရာလွတ်တွေကို သန့်ရှင်းအောင်လုပ်မယ်
+            reply = re.sub(r'\s+', ' ', reply)
+            reply = reply.strip()
             
             if len(reply) > 4000:
                 reply = reply[:4000] + "..."
