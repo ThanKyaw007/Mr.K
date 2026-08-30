@@ -1,7 +1,6 @@
 import os
 import threading
 import re
-import requests
 from flask import Flask
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -9,11 +8,11 @@ from huggingface_hub import InferenceClient
 
 # ====== API Keys ======
 TELEGRAM_BOT_TOKEN = "8617869426:AAHSSyjxzn6Jd_NfOqseGM82ZoCo1EGGbNE"
-HF_TOKEN = "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"  # သင့် Hugging Face Token ကို ထည့်ပါ
+HF_TOKEN = "hf_..."  # သင့် Hugging Face Token ကို ထည့်ပါ
 
 # ====== Hugging Face Settings ======
-hf_client = InferenceClient(token=HF_TOKEN)
-HF_MODEL = "microsoft/DialoGPT-medium"  # ဒီမော်ဒယ်ကို ပြောင်းလို့ရပါတယ်
+client = InferenceClient(token=HF_TOKEN)
+MODEL = "microsoft/DialoGPT-medium"  # စကားပြောမော်ဒယ်
 
 # ====== Flask ======
 flask_app = Flask(__name__)
@@ -26,7 +25,7 @@ def home():
 def health():
     return "OK", 200
 
-# ====== လင့်ခ်နဲ့ ကြော်ငြာတွေကို ဖယ်ရှားတဲ့ Function ======
+# ====== clean_text ======
 def clean_text(text):
     text = re.sub(r'https?://\S+', '', text)
     text = re.sub(r't\.me/\S+', '', text)
@@ -98,14 +97,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
 
     try:
-        response = hf_client.text_generation(
-            model=HF_MODEL,
+        response = client.text_generation(
+            model=MODEL,
             prompt=user_message,
-            max_new_tokens=200,
+            max_new_tokens=100,
             temperature=0.7
         )
-        reply = response
-        reply = clean_text(reply)
+        reply = clean_text(response)
         
         if len(reply) > 4000:
             reply = reply[:4000] + "..."
