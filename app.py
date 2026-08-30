@@ -93,6 +93,7 @@ def run_bot():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
     print("✅ ဘော့ အဆင်သင့်ဖြစ်ပါပြီ!")
+    print("⏳ Polling စတင်နေပါပြီ...")  #
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 # ====== အဓိကအပိုင်း ======
