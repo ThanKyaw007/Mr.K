@@ -12,7 +12,7 @@ OPENROUTER_API_KEY = "sk-or-v1-08f58599da23753c83d2163c5580063c4be6f21937e792d7e
 
 # ====== OpenRouter Settings ======
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL = "google/gemma-3-27b-it:free"
+MODEL = "openrouter/free"
 
 # ====== Flask ======
 flask_app = Flask(__name__)
