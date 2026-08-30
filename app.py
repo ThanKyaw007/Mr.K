@@ -16,7 +16,7 @@ GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 # ပေါ့ပါးပြီး မြန်ဆန်တယ်
 # အကောင်းဆုံး ရွေးချယ်မှု (အကြံပြုထားတယ်)
 # တတိယ ဒါကို စမ်းကြည့်ပါ (ယေဘုယျသုံးမော်ဒယ်)
-MODEL = "mixtral-8x7b-32768" 
+MODEL = "gemma2-9b-it" 
 # ====== Flask ======
 flask_app = Flask(__name__)
 
