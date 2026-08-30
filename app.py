@@ -9,7 +9,7 @@ from huggingface_hub import InferenceClient
 
 # ====== API Keys ======
 TELEGRAM_BOT_TOKEN = "8617869426:AAHSSyjxzn6Jd_NfOqseGM82ZoCo1EGGbNE"
-HF_TOKEN = "hf_..."  # သင့် Hugging Face Token ကို ထည့်ပါ
+HF_TOKEN = "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"  # သင့် Hugging Face Token ကို ထည့်ပါ
 
 # ====== Hugging Face Settings ======
 client = InferenceClient(token=HF_TOKEN)
