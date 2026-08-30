@@ -15,7 +15,8 @@ client = InferenceClient(token=HF_TOKEN)
 # ရွေးချယ်စရာ ၂ (အရည်အသွေးအကောင်းဆုံး)
 # ရွေးချယ်စရာ ၃ (ပေါ့ပါးပြီး မြန်ဆန်)
 # ဒုတိယ ဒါကို စမ်းကြည့်ပါ (Google မော်ဒယ်)
-MODEL = "google/gemma-2-9b-it"
+# ပထမဆုံး ဒါကို စမ်းကြည့်ပါ (သေးငယ်ပြီး မြန်ဆန်)
+MODEL = "google/gemma-2-2b-it"
 
 # ====== Flask ======
 flask_app = Flask(__name__)
