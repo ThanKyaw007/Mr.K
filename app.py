@@ -13,7 +13,8 @@ HF_TOKEN = "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"
 # ====== Hugging Face Settings ======
 client = InferenceClient(token=HF_TOKEN)
 # ရွေးချယ်စရာ ၂ (အရည်အသွေးအကောင်းဆုံး)
-MODEL = "mistralai/Mistral-7B-Instruct-v0.2"
+# ရွေးချယ်စရာ ၃ (ပေါ့ပါးပြီး မြန်ဆန်)
+MODEL = "meta-llama/llama-3.2-3b-instruct:free"
 
 # ====== Flask ======
 flask_app = Flask(__name__)
