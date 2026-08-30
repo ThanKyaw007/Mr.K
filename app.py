@@ -77,9 +77,11 @@ def auto_reply(update: Update, context: CallbackContext):
 # ====== AI စကားပြော ======
 # ====== AI စကားပြော ======
 # ====== AI စကားပြော ======
+# ====== AI စကားပြော ======
 def handle_message(update: Update, context: CallbackContext):
     user_message = update.message.text
 
+    # နှုတ်ဆက်စကားတွေအတွက်
     if any(word in user_message.lower() for word in ["ဟိုင်း", "မင်္ဂလာ", "hello", "hi"]):
         update.message.reply_text("မင်္ဂလာပါ။ ကျွန်တော် ဒီမှာရှိပါတယ်။ သိချင်တာမေးပါနော်။")
         return
@@ -94,7 +96,7 @@ def handle_message(update: Update, context: CallbackContext):
         data = {
             "model": MODEL,
             "messages": [
-                {"role": "system", "content": "သင်ဟာ ယဉ်ကျေးပြီး အကူအညီပေးတတ်တဲ့ လက်ထောက်တစ်ယောက်ပါ။ မြန်မာလိုပဲ ဖြေပါ။ သင့်ကိုယ်သင် ရည်ညွှန်းတဲ့အခါ 'ကျွန်တော်' ဆိုတဲ့ စကားလုံးကိုပဲ သုံးပါ။ သင့်ရဲ့အဖြေတွေမှာ တရုတ်စာလုံး၊ ဂျပန်စာလုံး၊ အခြားဘာသာစကားတွေကို လုံးဝမသုံးပါနဲ့။ မြန်မာစာလုံးနဲ့ အင်္ဂလိပ်စာလုံးတွေကိုပဲ သုံးပါ။"},
+                {"role": "system", "content": "သင်ဟာ ယဉ်ကျေးပြီး အကူအညီပေးတတ်တဲ့ လက်ထောက်တစ်ယောက်ပါ။ မြန်မာလိုပဲ ဖြေပါ။ သင့်ကိုယ်သင် ရည်ညွှန်းတဲ့အခါ 'ကျွန်တော်' ဆိုတဲ့ စကားလုံးကိုပဲ သုံးပါ။ သင့်ရဲ့အဖြေတွေမှာ ဘယ်လိုလင့်ခ်မျိုးမှ မထည့်ပါနဲ့။ တရုတ်စာလုံး၊ ဂျပန်စာလုံး၊ အခြားဘာသာစကားတွေကို လုံးဝမသုံးပါနဲ့။"},
                 {"role": "user", "content": user_message}
             ],
             "max_tokens": 500,
@@ -107,21 +109,32 @@ def handle_message(update: Update, context: CallbackContext):
         if "choices" in response_data:
             reply = response_data["choices"][0]["message"]["content"].strip()
             
-            # ====== လင့်ခ်တွေကို ဖယ်ရှားမယ် ======
+            # ====== လင့်ခ်အကုန်ဖယ်ရှားမယ် (ပိုပြီးပြည့်စုံအောင်) ======
+            # t.me လင့်ခ်
             reply = re.sub(r'https?://t\.me/\S+', '', reply)
             reply = re.sub(r't\.me/\S+', '', reply)
+            # http/https လင့်ခ်
             reply = re.sub(r'http[s]?://\S+', '', reply)
+            # www လင့်ခ်
             reply = re.sub(r'www\.\S+', '', reply)
+            # Markdown လင့်ခ်
             reply = re.sub(r'\[.*?\]\(.*?\)', '', reply)
+            # Telegram လင့်ခ်ပုံစံအကုန်
+            reply = re.sub(r'@\w+', '', reply)  # @username
+            reply = re.sub(r'#\w+', '', reply)  # hashtag
             
             # ====== တရုတ်/ဂျပန်/ကိုရီးယားစာလုံးတွေကို ဖယ်ရှားမယ် ======
-            reply = re.sub(r'[\u4e00-\u9fff]+', '', reply)  # တရုတ်
-            reply = re.sub(r'[\u3040-\u30ff\u31f0-\u31ff]+', '', reply)  # ဂျပန်
-            reply = re.sub(r'[\uac00-\ud7af]+', '', reply)  # ကိုရီးယား
+            reply = re.sub(r'[\u4e00-\u9fff]+', '', reply)
+            reply = re.sub(r'[\u3040-\u30ff\u31f0-\u31ff]+', '', reply)
+            reply = re.sub(r'[\uac00-\ud7af]+', '', reply)
             
             # ====== နေရာလွတ်တွေကို သန့်ရှင်းအောင်လုပ်မယ် ======
             reply = re.sub(r'\s+', ' ', reply)
             reply = reply.strip()
+            
+            # အဖြေဗလာဖြစ်နေရင် ပုံမှန်စာသားပြန်ပို့မယ်
+            if not reply:
+                reply = "ကျွန်တော် နားလည်ပါတယ်။ ဒါပေမယ့် အခုအချိန်မှာ အဖြေရှာမရသေးပါဘူး။"
             
             if len(reply) > 4000:
                 reply = reply[:4000] + "..."
