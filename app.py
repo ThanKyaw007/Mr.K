@@ -6,13 +6,13 @@ from flask import Flask
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-# ====== API Keys ======
-TELEGRAM_BOT_TOKEN = "8617869426:AAHSSyjxzn6Jd_NfOqseGM82ZoCo1EGGbNE"
+# ====== API Keys (Render Environment ကနေ ယူမယ်) ======
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 OPENROUTER_API_KEY = "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"
 
 # ====== OpenRouter Settings ======
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL = "openai/gpt-3.5-turbo:free"  # အခမဲ့မော်ဒယ်
+MODEL = "openai/gpt-3.5-turbo:free"
 
 # ====== Flask ======
 flask_app = Flask(__name__)
@@ -37,7 +37,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
     
-    # နှုတ်ဆက်စကားတွေအတွက်
     if any(word in user_message.lower() for word in ["ဟိုင်း", "မင်္ဂလာ", "hello", "hi"]):
         await update.message.reply_text("မင်္ဂလာပါ။ ကျွန်တော် ဒီမှာရှိပါတယ်။ သိချင်တာမေးပါနော်။")
         return
@@ -64,7 +63,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if "choices" in response_data:
             reply = response_data["choices"][0]["message"]["content"].strip()
-            # လင့်ခ်တွေကို ဖယ်ရှားမယ်
             reply = re.sub(r'http\S+|https\S+', '', reply)
             if len(reply) > 4000:
                 reply = reply[:4000] + "..."
@@ -82,7 +80,7 @@ def run_bot():
     print("🤖 ဘော့စတင်နေပါပြီ...")
     
     if not TELEGRAM_BOT_TOKEN:
-        print("❌ TELEGRAM_BOT_TOKEN မရှိပါ!")
+        print("❌ TELEGRAM_BOT_TOKEN မရှိပါ! Environment Variables ကို စစ်ပါ။")
         return
     
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
