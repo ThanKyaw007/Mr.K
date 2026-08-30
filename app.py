@@ -3,6 +3,7 @@ import threading
 import re
 import requests
 from flask import Flask
+from telegram import Update  # ← ဒီလိုင်း ပါရပါမယ်
 from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackContext
 from telegram.ext import filters
 from google import genai
