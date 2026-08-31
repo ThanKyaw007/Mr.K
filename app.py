@@ -12,10 +12,15 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or "8617869426:AAHzomx
 OPENROUTER_API_KEY = (os.environ.get("OPENROUTER_API_KEY") or "").strip() or "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"
 
 # ====== OpenRouter Settings ======
+# ====== OpenRouter Settings ======
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-# Free-tier OK models
-# MODEL = "mistralai/mistral-7b-instruct:free"
+# Free models you can use
+MODEL = "mistralai/mistral-7b-instruct:free"
+# MODEL = "nousresearch/nous-hermes-2-mistral-7b:free"
+# MODEL = "gryphe/mythomax-l2-13b:free"
+# MODEL = "meta-llama/llama-3.1-8b-instruct:free"
+# MODEL = "qwen/qwen2.5-7b-instruct:free"
 
 # ====== Flask ======
 flask_app = Flask(__name__)
