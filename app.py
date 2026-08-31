@@ -14,7 +14,8 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY") or "gsk_U2hVLg4rlZH0jmg9VTG1WGdyb3
 # ====== Groq Settings ======
 # ====== Groq Settings ======
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-MODEL = "facebook/blenderbot-400M-distill"  # ← ဒီမော်ဒယ်က သေချာအလုပ်လုပ်တယ်
+MODEL = "# ရွေးချယ်စရာ ၃ (စွမ်းဆောင်ရည်ကောင်း)
+MODEL = "qwen-2.5-32b"  # ← ဒီမော်ဒယ်က သေချာအလုပ်လုပ်တယ်
 
 # ====== Flask ======
 flask_app = Flask(__name__)
