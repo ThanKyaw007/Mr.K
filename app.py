@@ -9,12 +9,12 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 
 # ====== API Keys ======
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or "8617869426:AAHzomx_Uikd_S69UxCGAp4avOWUx6ytqVM"
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY") or "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"
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY") or "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"
 
-# ====== Groq Settings ======
-# ====== Groq Settings ======
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-MODEL = "qwen-2.5-32b"  # ← ဒီမော်ဒယ်က သေချာအလုပ်လုပ်တယ်
+# ====== OpenRouter Settings ======
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+# သေချာအလုပ်လုပ်မယ့် အခမဲ့မော်ဒယ်
+MODEL = "google/gemma-2-2b-it:free"
 
 # ====== Flask ======
 flask_app = Flask(__name__)
@@ -60,7 +60,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "ဘာမေးမေး မြန်မာလိုပဲ မေးပါ။"
     )
 
-# ====== AI Chat (Groq) ======
+# ====== AI Chat (OpenRouter) ======
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
     bot_name = get_bot_name(user_message)
@@ -69,7 +69,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         headers = {
-            "Authorization": f"Bearer {GROQ_API_KEY}".strip(),
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
             "Content-Type": "application/json"
         }
 
@@ -94,7 +94,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "temperature": 0.85
         }
 
-        response = requests.post(GROQ_URL, headers=headers, json=data)
+        response = requests.post(OPENROUTER_URL, headers=headers, json=data)
         response_data = response.json()
 
         if "choices" in response_data:
