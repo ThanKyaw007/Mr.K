@@ -7,7 +7,7 @@ from google import genai
 
 # ====== API Keys ======
 TELEGRAM_BOT_TOKEN = "8617869426:AAHSSyjxzn6Jd_NfOqseGM82ZoCo1EGGbNE"
-GEMINI_API_KEY = "AQ.Ab8RN6LJIM2qMmQfB8ElrXyI5hl6CQi8N8bZ1x9m18Ov4g4O7A"
+GEMINI_API_KEY = "AQ.Ab8RN6LFY8nLY9eEJF-sFnphBLISvetAnTM6F5gSFDH4up8gtw"
 
 # ====== Gemini Client ======
 client = genai.Client(api_key=GEMINI_API_KEY)
