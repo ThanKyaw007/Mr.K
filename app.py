@@ -98,19 +98,33 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         response_data = response.json()
 
         if "choices" in response_data:
+                    response = requests.post(GROQ_URL, headers=headers, json=data)
+        response_data = response.json()
+
+        if "choices" in response_data:
             reply = response_data["choices"][0]["message"]["content"].strip()
             reply = clean_text(reply)
 
             if bot_name:
                 reply = f"{bot_name} ပြောတယ်... {reply}"
 
-            await update.message.reply_text(reply)
-        else:
-            error_msg = response_data.get("error", {}).get("message", "Unknown error")
-            await update.message.reply_text(f"😅 {error_msg}")
+            await update.message.reply_text(reply, disable_web_page_preview=True)
 
-    except Exception as e:
-        await update.message.reply_text(f"😅 Error: {str(e)[:100]}")
+        else:
+            # Raw error message from Groq
+            error_msg = response_data.get("error", {}).get("message", "Unknown error")
+
+            # Remove links (no preview, no docs URL)
+            error_msg = re.sub(r'https?://\S+', '', error_msg)
+            error_msg = re.sub(r'www\.\S+', '', error_msg)
+
+            # Special handling for model errors
+            if "decommissioned" in error_msg or "does not exist" in error_msg:
+                clean_msg = "မင်းသုံးထားတဲ့ AI model ကို Groq က ပိတ်လိုက်ပြီ သို့မဟုတ် မရှိတော့ဘူး။ Model name ကို ပြန်ပြင်လိုက်ပါနော်။"
+            else:
+                clean_msg = f"Groq က error ပေးတယ် — {error_msg.strip()}"
+
+            await update.message.reply_text(f"😅 {clean_msg}", disable_web_page_preview=True)
 
 # ====== Run Bot ======
 def run_bot():
