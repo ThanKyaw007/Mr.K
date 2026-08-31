@@ -35,7 +35,7 @@ def handle_message(update: Update, context: CallbackContext):
     
     try:
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-3.6-flash',
             contents=user_message
         )
         reply = response.text
