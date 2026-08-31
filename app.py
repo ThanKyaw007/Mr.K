@@ -15,8 +15,6 @@ OPENROUTER_API_KEY = (os.environ.get("OPENROUTER_API_KEY") or "").strip() or "sk
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # Free-tier OK models
-MODEL = "openai/gpt-4o-mini:free"
-# သို့မဟုတ်
 # MODEL = "mistralai/mistral-7b-instruct:free"
 
 # ====== Flask ======
