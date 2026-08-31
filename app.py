@@ -7,7 +7,7 @@ from google import genai
 
 # ====== API Keys ======
 TELEGRAM_BOT_TOKEN = "8617869426:AAHSSyjxzn6Jd_NfOqseGM82ZoCo1EGGbNE"
-GEMINI_API_KEY = "AIzaSy..."  # Google AI Studio ကနေ ရယူပါ
+GEMINI_API_KEY = "AQ.Ab8RN6K1YM_LneLp_lX5R7YyPa1RgBu9bR_1JzKa-q_WyocMug"  # Google AI Studio ကနေ ရယူပါ
 
 # ====== Gemini Settings ======
 client = genai.Client(api_key=GEMINI_API_KEY)
