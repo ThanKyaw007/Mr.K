@@ -13,8 +13,14 @@ TELEGRAM_BOT_TOKEN = "8617869426:AAHzomx_Uikd_S69UxCGAp4avOWUx6ytqVM"
 HF_TOKEN = "HFAKaYCqGLogsxVCcKihWZCStnMRFzJ"  # Hugging Face Token
 
 # ====== Hugging Face Settings ======
+# ====== Hugging Face Settings ======
 MODEL = "microsoft/DialoGPT-medium"
 HF_URL = f"https://api-inference.huggingface.co/models/{MODEL}"
+
+# ====== AI Chat ======
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ...
+    response = requests.post(HF_URL, headers=headers, json=payload)  # ← ဒီလိုပြင်ပါ
 
 # ====== Flask ======
 flask_app = Flask(__name__)
