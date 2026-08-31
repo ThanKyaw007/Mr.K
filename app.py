@@ -16,8 +16,7 @@ OPENROUTER_API_KEY = (os.environ.get("OPENROUTER_API_KEY") or "").strip() or "sk
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # Free models you can use
-MODEL = "gryphe/mythomax-l2-13b:free"
-# MODEL = "meta-llama/llama-3.1-8b-instruct:free"
+MODEL = "meta-llama/llama-3.1-8b-instruct:free"
 # MODEL = "qwen/qwen2.5-7b-instruct:free"
 
 # ====== Flask ======
