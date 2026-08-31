@@ -69,9 +69,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         headers = {
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "Content-Type": "application/json"
-        }
+    "Authorization": f"Bearer {OPENROUTER_API_KEY.strip()}",
+    "Content-Type": "application/json"
+}
+
 
         system_prompt = (
             "သင်ဟာ မစ္စတာသန်း (Mr.T) — funny, friendly, motivational AI Bot ဖြစ်ပါတယ်။ "
