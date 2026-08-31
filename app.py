@@ -9,11 +9,11 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 
 # ====== API Keys ======
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or "8617869426:AAHzomx_Uikd_S69UxCGAp4avOWUx6ytqVM"
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY") or "sk-a85b8b5818854e4ea2b49fd9fb923fb0"
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY") or "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"
 
-# ====== DeepSeek Settings ======
-DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
-MODEL = "deepseek/deepseek-v4-flash:free"
+# ====== OpenRouter Settings ======
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+MODEL = "deepseek/deepseek-v4-flash:free"  # OpenRouter ကနေ DeepSeek အခမဲ့
 
 # ====== Flask ======
 flask_app = Flask(__name__)
@@ -59,7 +59,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "ဘာမေးမေး မြန်မာလိုပဲ မေးပါ။"
     )
 
-# ====== AI Chat (DeepSeek) ======
+# ====== AI Chat (OpenRouter) ======
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
     bot_name = get_bot_name(user_message)
@@ -68,7 +68,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         headers = {
-            "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
             "Content-Type": "application/json"
         }
 
@@ -93,7 +93,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "temperature": 0.85
         }
 
-        response = requests.post(DEEPSEEK_URL, headers=headers, json=data)
+        response = requests.post(OPENROUTER_URL, headers=headers, json=data)
         response_data = response.json()
 
         if "choices" in response_data:
