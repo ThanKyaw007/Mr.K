@@ -9,7 +9,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # ====== API Keys ======
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")  
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
 # ====== Groq Settings ======
@@ -40,7 +40,7 @@ def clean_text(text):
     text = re.sub(r'https?://\S+', '', text)
     text = re.sub(r't\.me/\S+', '', text)
     text = re.sub(r'www\.\S+', '', text)
-    text = re.sub(r'\[.*?\]\(.*?\)', '', text)  # ← ပြင်ထားတယ်
+    text = re.sub(r'\[.*?\]\(.*?\)', '', text)
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
@@ -69,7 +69,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         headers = {
-            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Authorization": f"Bearer {GROQ_API_KEY}".strip(),  # ← strip() ထည့်ထားတယ်
             "Content-Type": "application/json"
         }
 
@@ -106,12 +106,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             await update.message.reply_text(reply)
         else:
-            await update.message.reply_text("😅 AI response error!")
+            error_msg = response_data.get("error", {}).get("message", "Unknown error")
+            await update.message.reply_text(f"😅 {error_msg}")
 
     except Exception as e:
         await update.message.reply_text(f"😅 Error: {str(e)[:100]}")
 
-# ====== Run Bot (asyncio နဲ့ မှန်ကန်စွာ) ======
+# ====== Run Bot ======
 def run_bot():
     print("🤖 Bot starting...")
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
@@ -122,7 +123,6 @@ def run_bot():
 
     print("✅ Bot ready!")
     
-    # asyncio ကို မှန်ကန်စွာ သတ်မှတ်ပါ
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(app.run_polling(allowed_updates=Update.ALL_TYPES))
