@@ -12,7 +12,7 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or "8617869426:AAHzomx
 HF_TOKEN = os.environ.get("HF_TOKEN")  # Render မှာ ထည့်ပါ
 
 # ====== Hugging Face Settings (ပိုကောင်းတဲ့ မော်ဒယ်) ======
-MODEL = "google/gemma-2-2b-it"  # DialoGPT ထက် ပိုကောင်းတယ်
+MODEL = "google/gemma-2-2b-it"
 HF_URL = f"https://api-inference.huggingface.co/models/{MODEL}"
 
 # ====== Flask ======
