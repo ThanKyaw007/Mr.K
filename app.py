@@ -16,8 +16,7 @@ OPENROUTER_API_KEY = (os.environ.get("OPENROUTER_API_KEY") or "").strip() or "sk
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # Free models you can use
-MODEL = "mistralai/mistral-7b-instruct:free"
-# MODEL = "nousresearch/nous-hermes-2-mistral-7b:free"
+MODEL = "nousresearch/nous-hermes-2-mistral-7b:free"
 # MODEL = "gryphe/mythomax-l2-13b:free"
 # MODEL = "meta-llama/llama-3.1-8b-instruct:free"
 # MODEL = "qwen/qwen2.5-7b-instruct:free"
