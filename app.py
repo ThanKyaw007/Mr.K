@@ -7,11 +7,12 @@ from google import genai
 
 # ====== API Keys ======
 TELEGRAM_BOT_TOKEN = "8617869426:AAHSSyjxzn6Jd_NfOqseGM82ZoCo1EGGbNE"
-GEMINI_API_KEY = "AQ.Ab8RN6LJIM2qMmQfB8ElrXyI5hl6CQi8N8bZ1x9m18Ov4g4O7A"  # Google AI Studio ကနေ ရယူပါ
+GEMINI_API_KEY = "AQ.Ab8RN6LJIM2qMmQfB8ElrXyI5hl6CQi8N8bZ1x9m18Ov4g4O7A"
 
-# ====== Gemini Settings ======
+# ====== Gemini Client ======
 client = genai.Client(api_key=GEMINI_API_KEY)
 
+# ====== Flask ======
 flask_app = Flask(__name__)
 
 @flask_app.route('/')
