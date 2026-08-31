@@ -43,7 +43,8 @@ def handle_message(update: Update, context: CallbackContext):
             reply = reply[:4000] + "..."
         update.message.reply_text(reply)
     except Exception as e:
-        update.message.reply_text(f"😅 Error: {str(e)[:100]}")
+        error_msg = str(e)
+        update.message.reply_text(f"😅 Error: {error_msg[:200]}")
 
 def run_bot():
     print("🤖 ဘော့စတင်နေပါပြီ...")
