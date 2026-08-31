@@ -1,5 +1,6 @@
 import os
 import threading
+import asyncio
 import requests
 from flask import Flask
 from telegram import Update
@@ -90,7 +91,11 @@ def run_bot():
     app.add_handler(CommandHandler("price", price))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
     print("✅ ဘော့ အဆင်သင့်ဖြစ်ပါပြီ!")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    
+    # asyncio ကို မှန်ကန်စွာ သတ်မှတ်ပါ
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(app.run_polling(allowed_updates=Update.ALL_TYPES))
 
 if __name__ == "__main__":
     bot_thread = threading.Thread(target=run_bot)
