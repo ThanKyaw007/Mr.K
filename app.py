@@ -14,7 +14,7 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
 # ====== Groq Settings ======
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-MODEL = "llama-3.1-70b-versatile"  # deepseek model deprecated, safe choice
+MODEL = "llama-3.3-70b-versatile"  # ← ဒီမော်ဒယ်က ရနေတယ်
 
 # ====== Flask ======
 flask_app = Flask(__name__)
@@ -40,11 +40,7 @@ def clean_text(text):
     text = re.sub(r'https?://\S+', '', text)
     text = re.sub(r't\.me/\S+', '', text)
     text = re.sub(r'www\.\S+', '', text)
-    text = re.sub(r'
-
-\[.*?\]
-
-\(.*?\)', '', text)
+    text = re.sub(r'\[.*?\]\(.*?\)', '', text)  # ← ပြင်ထားတယ်
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
@@ -128,7 +124,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = re.sub(r'www\.\S+', '', msg)
         await update.message.reply_text(f"😅 Internal error ဖြစ်နေတယ် — {msg}", disable_web_page_preview=True)
 
-# ====== Run Bot ======
+# ====== Run Bot (asyncio နဲ့ မှန်ကန်စွာ) ======
 def run_bot():
     print("🤖 Bot starting...")
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
@@ -138,7 +134,11 @@ def run_bot():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     print("✅ Bot ready!")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+
+    # asyncio ကို မှန်ကန်စွာ သတ်မှတ်ပါ
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(app.run_polling(allowed_updates=Update.ALL_TYPES))
 
 # ====== Run Flask ======
 def run_flask():
