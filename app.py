@@ -2,25 +2,18 @@ import os
 import threading
 import asyncio
 import requests
-import json
 import re
 from flask import Flask
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # ====== API Keys ======
-TELEGRAM_BOT_TOKEN = "8617869426:AAHzomx_Uikd_S69UxCGAp4avOWUx6ytqVM"
-HF_TOKEN = "HFAKaYCqGLogsxVCcKihWZCStnMRFzJ"  # Hugging Face Token
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or "8617869426:AAHzomx_Uikd_S69UxCGAp4avOWUx6ytqVM"
+HF_TOKEN = os.environ.get("HF_TOKEN")  # Render မှာ HF_TOKEN ထည့်ပါ
 
-# ====== Hugging Face Settings ======
 # ====== Hugging Face Settings ======
 MODEL = "microsoft/DialoGPT-medium"
 HF_URL = f"https://api-inference.huggingface.co/models/{MODEL}"
-
-# ====== AI Chat ======
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # ...
-    response = requests.post(HF_URL, headers=headers, json=payload)  # ← ဒီလိုပြင်ပါ
 
 # ====== Flask ======
 flask_app = Flask(__name__)
@@ -46,7 +39,7 @@ def clean_text(text):
     text = re.sub(r'https?://\S+', '', text)
     text = re.sub(r't\.me/\S+', '', text)
     text = re.sub(r'www\.\S+', '', text)
-    text = re.sub(r'\[.*?\]\(.*?\)', '', text)
+    text = re.sub(r'\[.*?\]\(.*?\)', '', text)  # ← ပြင်ထားတယ်
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
@@ -79,37 +72,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Content-Type": "application/json"
         }
 
-        # Hugging Face API ကို ခေါ်မယ် (system prompt မပါဘူး)
         payload = {
             "inputs": user_message,
             "parameters": {
-                "max_new_tokens": 300,
-                "temperature": 0.85,
+                "max_new_tokens": 200,
+                "temperature": 0.8,
                 "do_sample": True
             }
         }
 
-        response = requests.post(
-            HF_URL,  # ← ပြင်ထားတယ်
-            headers=headers,
-            json=payload
-        )
+        response = requests.post(HF_URL, headers=headers, json=payload)
         response_data = response.json()
 
-        # Response ကို ထုတ်ယူမယ်
-        if response.status_code == 200:
-            if isinstance(response_data, list) and len(response_data) > 0:
-                reply = response_data[0].get("generated_text", "").strip()
-                # user_message ကို ဖယ်ရှားမယ် (တစ်ခါတရံ ပါတတ်တယ်)
-                if reply.startswith(user_message):
-                    reply = reply[len(user_message):].strip()
-                reply = clean_text(reply)
-            else:
-                reply = "အဖြေမရှိပါ"
+        if response.status_code == 200 and isinstance(response_data, list) and len(response_data) > 0:
+            reply = response_data[0].get("generated_text", "").strip()
+            if reply.startswith(user_message):
+                reply = reply[len(user_message):].strip()
+            reply = clean_text(reply)
         else:
             error_msg = response_data.get("error", "Unknown error")
-            await update.message.reply_text(f"😅 {error_msg}", disable_web_page_preview=True)
-            return
+            reply = f"😅 Hugging Face error — {error_msg}"
 
         if bot_name:
             reply = f"{bot_name} ပြောတယ်... {reply}"
@@ -118,8 +100,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         msg = str(e)[:100]
-        msg = re.sub(r'https?://\S+', '', msg)
-        msg = re.sub(r'www\.\S+', '', msg)
+        msg = clean_text(msg)
         await update.message.reply_text(f"😅 Error — {msg}", disable_web_page_preview=True)
 
 # ====== Run Bot ======
