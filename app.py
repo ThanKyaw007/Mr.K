@@ -14,7 +14,7 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
 # ====== Groq Settings ======
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-MODEL = "llama-3.3-70b-versatile"  # ← ဒီမော်ဒယ်က ရနေတယ်
+MODEL = "llama-3.1-70b-versatile"
 
 # ====== Flask ======
 flask_app = Flask(__name__)
