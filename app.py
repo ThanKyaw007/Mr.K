@@ -113,11 +113,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text(reply, disable_web_page_preview=True)
 
-    except requests.exceptions.Timeout:
-        await update.message.reply_text("😅 အချိန်လွန်သွားတယ်။ မော်ဒယ်က အိပ်စက်နေလို့ ပြန်နိုးဖို့ စက္ကန့် ၃၀ လောက် ကြာတယ်။ နောက်မှ ပြန်မေးပါ။")
-    except Exception as e:
-        msg = clean_text(str(e)[:200])
-        await update.message.reply_text(f"😅 Error — {msg}", disable_web_page_preview=True)
+    import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+def create_session():
+    session = requests.Session()
+    retries = Retry(
+        total=5,
+        backoff_factor=1,
+        status_forcelist=[500, 502, 503, 504],
+        allowed_methods=["GET", "POST"]
+    )
+    adapter = HTTPAdapter(max_retries=retries)
+    session.mount('https://', adapter)
+    session.mount('http://', adapter)
+    return session
+
+# handle_message ထဲမှာ
+session = create_session()
+response = session.post(HF_URL, headers=headers, json=payload, timeout=60)
 
 # ====== Run Bot ======
 def run_bot():
