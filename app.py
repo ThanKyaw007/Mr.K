@@ -10,12 +10,11 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 
 # ====== API Keys ======
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+HF_TOKEN = os.environ.get("HF_TOKEN")  # Hugging Face Token
 
-# ====== Groq Settings ======
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-# တတိယ ဒါကို စမ်းကြည့်ပါ (Google မော်ဒယ်)
-MODEL = "gemma‑7b‑it"
+# ====== Hugging Face Settings ======
+HF_URL = "https://api-inference.huggingface.co/models/"
+MODEL = "google/gemma-7b-it"  # ဒါမှမဟုတ် "microsoft/DialoGPT-medium"
 
 # ====== Flask ======
 flask_app = Flask(__name__)
@@ -41,7 +40,7 @@ def clean_text(text):
     text = re.sub(r'https?://\S+', '', text)
     text = re.sub(r't\.me/\S+', '', text)
     text = re.sub(r'www\.\S+', '', text)
-    text = re.sub(r'\[.*?\]\(.*?\)', '', text)  # ← ပြင်ထားတယ်
+    text = re.sub(r'\[.*?\]\(.*?\)', '', text)
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
@@ -61,7 +60,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "ဘာမေးမေး မြန်မာလိုပဲ မေးပါ။"
     )
 
-# ====== AI Chat ======
+# ====== AI Chat (Hugging Face) ======
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
     bot_name = get_bot_name(user_message)
@@ -70,8 +69,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         headers = {
-            "Authorization": f"Bearer {GROQ_API_KEY}".strip(),
-            "Content-Type": "application/json"
+            "Authorization": f"Bearer {HF_TOKEN}".strip()
         }
 
         system_prompt = (
@@ -85,21 +83,28 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Personality: Than ကို motivate လုပ်ပါ။ Funny tone, friendly tone, human-like vibe နဲ့ ပြန်ပါ။ "
         )
 
-        data = {
-            "model": MODEL,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message}
-            ],
-            "max_tokens": 500,
-            "temperature": 0.85
+        # Hugging Face API ကို ခေါ်မယ်
+        payload = {
+            "inputs": f"{system_prompt}\n\nUser: {user_message}\nAssistant:",
+            "parameters": {
+                "max_new_tokens": 500,
+                "temperature": 0.85,
+                "do_sample": True
+            }
         }
 
-        response = requests.post(GROQ_URL, headers=headers, json=data)
+        response = requests.post(
+            f"{HF_URL}{MODEL}",
+            headers=headers,
+            json=payload
+        )
         response_data = response.json()
 
-        if "choices" in response_data:
-            reply = response_data["choices"][0]["message"]["content"].strip()
+        if isinstance(response_data, list) and len(response_data) > 0:
+            reply = response_data[0].get("generated_text", "").strip()
+            # Assistant: ရဲ့ နောက်က အဖြေကို ယူမယ်
+            if "Assistant:" in reply:
+                reply = reply.split("Assistant:")[-1].strip()
             reply = clean_text(reply)
 
             if bot_name:
@@ -108,16 +113,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(reply, disable_web_page_preview=True)
 
         else:
-            error_msg = response_data.get("error", {}).get("message", "Unknown error")
-            error_msg = re.sub(r'https?://\S+', '', error_msg)
-            error_msg = re.sub(r'www\.\S+', '', error_msg)
-
-            if "decommissioned" in error_msg or "does not exist" in error_msg:
-                clean_msg = "သုံးထားတဲ့ AI model ကို Groq က ပိတ်လိုက်ပြီ။ Model name ကို ပြန်ပြင်ပါ။"
-            else:
-                clean_msg = f"Groq error — {error_msg.strip()}"
-
-            await update.message.reply_text(f"😅 {clean_msg}", disable_web_page_preview=True)
+            error_msg = response_data.get("error", "Unknown error")
+            await update.message.reply_text(f"😅 {error_msg}", disable_web_page_preview=True)
 
     except Exception as e:
         msg = str(e)[:100]
@@ -136,7 +133,6 @@ def run_bot():
 
     print("✅ Bot ready!")
     
-    # asyncio ကို မှန်ကန်စွာ သတ်မှတ်ပါ
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(app.run_polling(allowed_updates=Update.ALL_TYPES))
