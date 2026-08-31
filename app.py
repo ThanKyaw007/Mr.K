@@ -6,12 +6,14 @@ import re
 from flask import Flask
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # ====== API Keys ======
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or "8617869426:AAHzomx_Uikd_S69UxCGAp4avOWUx6ytqVM"
 HF_TOKEN = os.environ.get("HF_TOKEN")  # Render မှာ ထည့်ပါ
 
-# ====== Hugging Face Settings (ပိုကောင်းတဲ့ မော်ဒယ်) ======
+# ====== Hugging Face Settings ======
 MODEL = "google/gemma-2-2b-it"
 HF_URL = f"https://api-inference.huggingface.co/models/{MODEL}"
 
@@ -25,6 +27,20 @@ def home():
 @flask_app.route('/health')
 def health():
     return "OK", 200
+
+# ====== Session with Retry ======
+def create_session():
+    session = requests.Session()
+    retries = Retry(
+        total=5,
+        backoff_factor=1,
+        status_forcelist=[500, 502, 503, 504],
+        allowed_methods=["GET", "POST"]
+    )
+    adapter = HTTPAdapter(max_retries=retries)
+    session.mount('https://', adapter)
+    session.mount('http://', adapter)
+    return session
 
 # ====== Bot Personality ======
 BOT_NAMES = ["မစ္စတာတီ", "မစ္စတာသန်း", "ကိုသန်း"]
@@ -59,7 +75,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "ဘာမေးမေး မြန်မာလိုပဲ မေးပါ။"
     )
 
-# ====== AI Chat (Hugging Face - Gemma) ======
+# ====== AI Chat (Hugging Face) ======
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
     bot_name = get_bot_name(user_message)
@@ -85,13 +101,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             }
         }
 
-        response = requests.post(HF_URL, headers=headers, json=payload, timeout=60)
+        # ====== Session ကို သုံးပါ ======
+        session = create_session()
+        response = session.post(HF_URL, headers=headers, json=payload, timeout=60)
         response_data = response.json()
 
         if response.status_code == 200:
             if isinstance(response_data, list) and len(response_data) > 0:
                 reply = response_data[0].get("generated_text", "").strip()
-                # "Assistant:" ရဲ့ နောက်က အဖြေကို ယူမယ်
                 if "Assistant:" in reply:
                     reply = reply.split("Assistant:")[-1].strip()
                 elif reply.startswith("User:"):
@@ -113,26 +130,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text(reply, disable_web_page_preview=True)
 
-    import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
-
-def create_session():
-    session = requests.Session()
-    retries = Retry(
-        total=5,
-        backoff_factor=1,
-        status_forcelist=[500, 502, 503, 504],
-        allowed_methods=["GET", "POST"]
-    )
-    adapter = HTTPAdapter(max_retries=retries)
-    session.mount('https://', adapter)
-    session.mount('http://', adapter)
-    return session
-
-# handle_message ထဲမှာ
-session = create_session()
-response = session.post(HF_URL, headers=headers, json=payload, timeout=60)
+    except requests.exceptions.Timeout:
+        await update.message.reply_text("😅 အချိန်လွန်သွားတယ်။ မော်ဒယ်က အိပ်စက်နေလို့ ပြန်နိုးဖို့ စက္ကန့် ၃၀ လောက် ကြာတယ်။ နောက်မှ ပြန်မေးပါ။")
+    except Exception as e:
+        msg = clean_text(str(e)[:200])
+        await update.message.reply_text(f"😅 Error — {msg}", disable_web_page_preview=True)
 
 # ====== Run Bot ======
 def run_bot():
