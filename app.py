@@ -11,15 +11,13 @@ import requests
 TELEGRAM_BOT_TOKEN = "8617869426:AAHzomx_Uikd_S69UxCGAp4avOWUx6ytqVM"
 GROQ_API_KEY = "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"
 
-"  # console.groq.com ကနေ ရယူပါ
-
 # ====== Groq Settings ======
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-MODEL = "llama-3.3-70b-versatile"  # အကောင်းဆုံး အခမဲ့မော်ဒယ်
+MODEL = "llama-3.3-70b-versatile"
 
 # ====== Memory Settings ======
-MAX_HISTORY = 10  # သိမ်းမယ့် စကားဝိုင်းအရေအတွက်
-conversations = {}  # user_id -> [{"role": "user", "content": "..."}, ...]
+MAX_HISTORY = 10
+conversations = {}
 
 # ====== Flask ======
 flask_app = Flask(__name__)
@@ -36,14 +34,12 @@ def health():
 BOT_NAMES = ["မစ္စတာတီ", "မစ္စတာသန်း", "ကိုသန်း", "mr t", "mr.t", "mrt"]
 
 def get_bot_name(text):
-    """သုံးစွဲသူပြောတဲ့ စာထဲက ဘော့နာမည်ကို ရှာမယ်"""
     for name in BOT_NAMES:
         if name.lower() in text.lower():
             return name
     return None
 
 def clean_text(text):
-    """စာသားကို သန့်ရှင်းအောင်လုပ်မယ်"""
     import re
     text = re.sub(r'https?://\S+', '', text)
     text = re.sub(r't\.me/\S+', '', text)
@@ -79,27 +75,24 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "ဘာမေးခွန်းမဆို မြန်မာလိုပဲ မေးလိုက်ပါ။"
     )
 
-# ====== /clear (Memory ရှင်းရန်) ======
+# ====== /clear ======
 async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id in conversations:
         conversations[user_id] = []
     await update.message.reply_text("🧹 စကားဝိုင်းမှတ်တမ်းကို ရှင်းလိုက်ပါပြီ။")
 
-# ====== AI စကားပြော (Groq) ======
+# ====== AI စကားပြော ======
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_message = update.message.text
     user_name = update.effective_user.first_name
 
-    # ဘော့နာမည်ကို စစ်ပါ
     bot_name = get_bot_name(user_message)
     
-    # Memory ကို စီမံပါ
     if user_id not in conversations:
         conversations[user_id] = []
 
-    # System Prompt (Personality)
     system_prompt = (
         "သင်ဟာ **မစ္စတာသန်း** (Mr.T) ပါ။ "
         "သင်ဟာ ဉာဏ်ကောင်းတယ်၊ ရယ်စရာကြိုက်တယ်၊ မြန်မာလိုကောင်းကောင်းပြောတယ်။ "
@@ -109,14 +102,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "သင့်ကိုယ်သင် ရည်ညွှန်းတဲ့အခါ 'ကျွန်တော်' ဆိုတဲ့ စကားလုံးကိုပဲ သုံးပါ။"
     )
 
-    # သုံးစွဲသူရဲ့ မေးခွန်းကို Memory ထဲထည့်
     conversations[user_id].append({"role": "user", "content": user_message})
     
-    # Memory အရမ်းကြီးရင် ဖြတ်မယ်
     if len(conversations[user_id]) > MAX_HISTORY * 2:
         conversations[user_id] = conversations[user_id][-MAX_HISTORY * 2:]
 
-    # Messages ကို ပြင်ဆင်မယ်
     messages = [{"role": "system", "content": system_prompt}]
     messages.extend(conversations[user_id])
 
@@ -141,18 +131,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply = response_data["choices"][0]["message"]["content"].strip()
             reply = clean_text(reply)
             
-            # အဖြေကို Memory ထဲထည့်
             conversations[user_id].append({"role": "assistant", "content": reply})
             
-            # သုံးစွဲသူခေါ်တဲ့နာမည်နဲ့ ပြန်ဖြေမယ်
             if bot_name:
-                # ဘော့နာမည်ပါတဲ့ စာကို ပြန်ဖြေတဲ့အခါ ရယ်စရာလေးထည့်မယ်
+                import random
                 joke_responses = [
                     f"အေး... {bot_name} ပြောတာကို နားထောင်ပါ။ {reply}",
                     f"{bot_name} ပြောတယ်... {reply}",
                     f"ဟုတ်ကဲ့... {bot_name} က {reply}",
                 ]
-                import random
                 reply = random.choice(joke_responses)
             
             if len(reply) > 4000:
