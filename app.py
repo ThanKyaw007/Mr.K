@@ -9,11 +9,11 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 
 # ====== API Keys ======
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or "8617869426:AAHzomx_Uikd_S69UxCGAp4avOWUx6ytqVM"
-OPENROUTER_API_KEY = (os.environ.get("OPENROUTER_API_KEY") or "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").strip()
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY") or "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"
 
 # ====== OpenRouter Settings ======
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL = "deepseek/deepseek-v4-flash:free"  # OpenRouter ကနေ DeepSeek ကို အခမဲ့သုံးမယ်
+MODEL = "meta-llama/llama-3.1-8b-instruct:free"
 
 # ====== Flask ======
 flask_app = Flask(__name__)
@@ -27,7 +27,8 @@ def health():
     return "OK", 200
 
 # ====== Bot Personality ======
-BOT_NAMES = ["မစ္စတာတီ", "မစ္စတာသန်း", "ကိုသန်း"]
+# နာမည်တစ်ခုတည်းပဲ ထားတယ်
+BOT_NAMES = ["မစ္စတာသန်း"]
 
 def get_bot_name(text):
     for name in BOT_NAMES:
@@ -59,7 +60,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "ဘာမေးမေး မြန်မာလိုပဲ မေးပါ။"
     )
 
-# ====== AI Chat (OpenRouter) ======
+# ====== AI Chat ======
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
     bot_name = get_bot_name(user_message)
