@@ -69,52 +69,46 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         headers = {
-            "Authorization": f"Bearer {HF_TOKEN}".strip()
+            "Authorization": f"Bearer {HF_TOKEN}".strip(),
+            "Content-Type": "application/json"
         }
 
-        system_prompt = (
-            "သင်ဟာ မစ္စတာသန်း (Mr.T) — funny, friendly, motivational AI Bot ဖြစ်ပါတယ်။ "
-            "Than ကို မိတ်ဆွေလို ပြောပါ။ ရယ်စရာလေးတွေ ထည့်ပါ။ "
-            "အဖြေတွေကို မြန်မာလိုပဲ ပြန်ပါ။ "
-            "Money Mindset Mode: User မေးတဲ့အခါ online income, skill တိုးတက်, money mindset, side hustle, motivation, action plan "
-            "အကြံပေးပါ။ Risky trading, guaranteed profit, illegal methods မပြောပါနဲ့။ Safe, ethical advice ပေးပါ။ "
-            "Attractive Personality Mode: User မေးတဲ့အခါ self-confidence, communication skill, social skill, relationship advice "
-            "healthy, respectful, confidence-building advice ပေးပါ။ Manipulation မလုပ်ပါနဲ့။ "
-            "Personality: Than ကို motivate လုပ်ပါ။ Funny tone, friendly tone, human-like vibe နဲ့ ပြန်ပါ။ "
-        )
-
-        # Hugging Face API ကို ခေါ်မယ်
+        # Hugging Face API ကို ခေါ်မယ် (system prompt မပါဘူး)
         payload = {
-            "inputs": f"{system_prompt}\n\nUser: {user_message}\nAssistant:",
+            "inputs": user_message,
             "parameters": {
-                "max_new_tokens": 500,
+                "max_new_tokens": 300,
                 "temperature": 0.85,
                 "do_sample": True
             }
         }
 
         response = requests.post(
-            f"{HF_URL}{MODEL}",
+            HF_URL,  # ← ပြင်ထားတယ်
             headers=headers,
             json=payload
         )
         response_data = response.json()
 
-        if isinstance(response_data, list) and len(response_data) > 0:
-            reply = response_data[0].get("generated_text", "").strip()
-            # Assistant: ရဲ့ နောက်က အဖြေကို ယူမယ်
-            if "Assistant:" in reply:
-                reply = reply.split("Assistant:")[-1].strip()
-            reply = clean_text(reply)
-
-            if bot_name:
-                reply = f"{bot_name} ပြောတယ်... {reply}"
-
-            await update.message.reply_text(reply, disable_web_page_preview=True)
-
+        # Response ကို ထုတ်ယူမယ်
+        if response.status_code == 200:
+            if isinstance(response_data, list) and len(response_data) > 0:
+                reply = response_data[0].get("generated_text", "").strip()
+                # user_message ကို ဖယ်ရှားမယ် (တစ်ခါတရံ ပါတတ်တယ်)
+                if reply.startswith(user_message):
+                    reply = reply[len(user_message):].strip()
+                reply = clean_text(reply)
+            else:
+                reply = "အဖြေမရှိပါ"
         else:
             error_msg = response_data.get("error", "Unknown error")
             await update.message.reply_text(f"😅 {error_msg}", disable_web_page_preview=True)
+            return
+
+        if bot_name:
+            reply = f"{bot_name} ပြောတယ်... {reply}"
+
+        await update.message.reply_text(reply, disable_web_page_preview=True)
 
     except Exception as e:
         msg = str(e)[:100]
@@ -132,7 +126,7 @@ def run_bot():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     print("✅ Bot ready!")
-    
+
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(app.run_polling(allowed_updates=Update.ALL_TYPES))
