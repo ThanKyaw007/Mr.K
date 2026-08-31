@@ -12,6 +12,7 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or "8617869426:AAHzomx
 HF_TOKEN = os.environ.get("HF_TOKEN")  # Render မှာ HF_TOKEN ထည့်ပါ
 
 # ====== Hugging Face Settings ======
+HF_TOKEN = os.environ.get("HF_TOKEN")
 MODEL = "microsoft/DialoGPT-medium"
 HF_URL = f"https://api-inference.huggingface.co/models/{MODEL}"
 
