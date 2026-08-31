@@ -162,14 +162,8 @@ def run_bot():
     app.add_handler(CommandHandler("clear", clear))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    print("✅ ဘော့ အဆင်သင့်ဖြစ်ပါပြီ!")
+    print("✅ ဘော့ အဆင်သင့်ဖြစ်ပါပြီ!")  # ← ဒီစာကြောင်း မရောက်သေးဘူး
     
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(app.run_polling(allowed_updates=Update.ALL_TYPES))
-
-if __name__ == "__main__":
-    bot_thread = threading.Thread(target=run_bot)
-    bot_thread.start()
-    port = int(os.environ.get("PORT", 5000))
-    flask_app.run(host="0.0.0.0", port=port)
