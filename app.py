@@ -9,8 +9,8 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # ====== API Keys ======
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-HF_TOKEN = os.environ.get("HF_TOKEN")  # Hugging Face Token
+TELEGRAM_BOT_TOKEN = "8617869426:AAHzomx_Uikd_S69UxCGAp4avOWUx6ytqVM"
+HF_TOKEN = "HFAKaYCqGLogsxVCcKihWZCStnMRFzJ"  # Hugging Face Token
 
 # ====== Hugging Face Settings ======
 MODEL = "microsoft/DialoGPT-medium"
