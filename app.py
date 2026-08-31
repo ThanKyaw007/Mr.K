@@ -40,11 +40,7 @@ def clean_text(text):
     text = re.sub(r'https?://\S+', '', text)
     text = re.sub(r't\.me/\S+', '', text)
     text = re.sub(r'www\.\S+', '', text)
-    text = re.sub(r'
-
-\[.*?\]
-
-\(.*?\)', '', text)
+    text = re.sub(r'\[.*?\]\(.*?\)', '', text)  # ← ပြင်ထားတယ်
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
@@ -115,11 +111,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"😅 Error: {str(e)[:100]}")
 
-# ====== Run Bot ======
-def run_flask():
-    port = int(os.environ.get("PORT", 5000))
-    flask_app.run(host="0.0.0.0", port=port)
-
+# ====== Run Bot (asyncio နဲ့ မှန်ကန်စွာ) ======
 def run_bot():
     print("🤖 Bot starting...")
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
@@ -129,7 +121,16 @@ def run_bot():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     print("✅ Bot ready!")
-    app.run_polling()
+    
+    # asyncio ကို မှန်ကန်စွာ သတ်မှတ်ပါ
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(app.run_polling(allowed_updates=Update.ALL_TYPES))
+
+# ====== Run Flask ======
+def run_flask():
+    port = int(os.environ.get("PORT", 5000))
+    flask_app.run(host="0.0.0.0", port=port)
 
 # ====== Main ======
 if __name__ == "__main__":
