@@ -40,7 +40,11 @@ def clean_text(text):
     text = re.sub(r'https?://\S+', '', text)
     text = re.sub(r't\.me/\S+', '', text)
     text = re.sub(r'www\.\S+', '', text)
-    text = re.sub(r'\[.*?\]\(.*?\)', '', text)
+    text = re.sub(r'
+
+\[.*?\]
+
+\(.*?\)', '', text)
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
@@ -48,14 +52,14 @@ def clean_text(text):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = update.effective_user.first_name
     await update.message.reply_text(
-        f"🙏 မင်္ဂလာပါ {user_name}။ ကျွန်တော် **မစ္စတာသန်း** (Mr.T) ပါ။\n\n"
+        f"🙏 မင်္ဂလာပါ {user_name}။ ကျွန်တော် မစ္စတာသန်း (Mr.T) ပါ။\n\n"
         "ဘာမေးမေး မြန်မာလိုပဲ မေးလိုက်ပါ။"
     )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📌 **အသုံးပြုနည်း**\n\n"
-        "/start - ဘော့ကိုစတင်ရန်\n"
+        "📌 အသုံးပြုနည်း\n\n"
+        "/start - ဘော့စတင်\n"
         "/help - အကူအညီ\n"
         "ဘာမေးမေး မြန်မာလိုပဲ မေးပါ။"
     )
@@ -74,14 +78,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
 
         system_prompt = (
-            "သင်ဟာ **မစ္စတာသန်း** (Mr.T) — funny, friendly, motivational AI Bot ဖြစ်ပါတယ်။ "
+            "သင်ဟာ မစ္စတာသန်း (Mr.T) — funny, friendly, motivational AI Bot ဖြစ်ပါတယ်။ "
             "Than ကို မိတ်ဆွေလို ပြောပါ။ ရယ်စရာလေးတွေ ထည့်ပါ။ "
             "အဖြေတွေကို မြန်မာလိုပဲ ပြန်ပါ။ "
-            "💰 Money Mindset Mode: User မေးတဲ့အခါ online income, skill တိုးတက်, money mindset, side hustle, motivation, action plan "
-            "အကြံပေးပါ။ Risky trading / guaranteed profit / illegal methods မပြောပါနဲ့။ Safe, ethical advice ပေးပါ။ "
-            "❤️ Attractive Personality Mode: User မေးတဲ့အခါ self-confidence, communication skill, social skill, relationship advice "
+            "Money Mindset Mode: User မေးတဲ့အခါ online income, skill တိုးတက်, money mindset, side hustle, motivation, action plan "
+            "အကြံပေးပါ။ Risky trading, guaranteed profit, illegal methods မပြောပါနဲ့။ Safe, ethical advice ပေးပါ။ "
+            "Attractive Personality Mode: User မေးတဲ့အခါ self-confidence, communication skill, social skill, relationship advice "
             "healthy, respectful, confidence-building advice ပေးပါ။ Manipulation မလုပ်ပါနဲ့။ "
-            "😎 Personality: Than ကို motivate လုပ်ပါ။ Funny tone, friendly tone, human-like vibe နဲ့ ပြန်ပါ။"
+            "Personality: Than ကို motivate လုပ်ပါ။ Funny tone, friendly tone, human-like vibe နဲ့ ပြန်ပါ။ "
         )
 
         data = {
@@ -112,24 +116,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"😅 Error: {str(e)[:100]}")
 
 # ====== Run Bot ======
+def run_flask():
+    port = int(os.environ.get("PORT", 5000))
+    flask_app.run(host="0.0.0.0", port=port)
+
 def run_bot():
-    print("🤖 မစ္စတာသန်း (Mr.T) ဘော့စတင်နေပါပြီ...")
+    print("🤖 Bot starting...")
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    print("✅ ဘော့ အဆင်သင့်ဖြစ်ပါပြီ!")
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(app.run_polling(allowed_updates=Update.ALL_TYPES))
+    print("✅ Bot ready!")
+    app.run_polling()
 
 # ====== Main ======
 if __name__ == "__main__":
-    # ဘော့ကို Thread နဲ့ စတင်မယ်
-    bot_thread = threading.Thread(target=run_bot)
-    bot_thread.start()
+    flask_thread = threading.Thread(target=run_flask)
+    flask_thread.start()
 
-    # Flask ကို main thread မှာ run မယ်
-    port = int(os.environ.get("PORT", 5000))
-    flask_app.run(host="0.0.0.0", port=port)
+    run_bot()
