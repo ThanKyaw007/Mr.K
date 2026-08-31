@@ -12,8 +12,9 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or "8617869426:AAHzomx
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY") or "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"
 
 # ====== Groq Settings ======
+# ====== Groq Settings ======
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-MODEL = "mixtral-8x7b-32768"  # သေချာအလုပ်လုပ်တယ်
+MODEL = "llama-3.3-70b-versatile"  # ← ဒီမော်ဒယ်က သေချာအလုပ်လုပ်တယ်
 
 # ====== Flask ======
 flask_app = Flask(__name__)
