@@ -6,16 +6,14 @@ import re
 from flask import Flask
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
 # ====== API Keys ======
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or "8617869426:AAHzomx_Uikd_S69UxCGAp4avOWUx6ytqVM"
-HF_TOKEN = os.environ.get("HF_TOKEN")  # Render မှာ ထည့်ပါ
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY") or "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"
 
-# ====== Hugging Face Settings ======
-MODEL = "google/gemma-2-2b-it"
-HF_URL = f"https://api-inference.huggingface.co/models/{MODEL}"
+# ====== Groq Settings ======
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+MODEL = "mixtral-8x7b-32768"  # သေချာအလုပ်လုပ်တယ်
 
 # ====== Flask ======
 flask_app = Flask(__name__)
@@ -27,20 +25,6 @@ def home():
 @flask_app.route('/health')
 def health():
     return "OK", 200
-
-# ====== Session with Retry ======
-def create_session():
-    session = requests.Session()
-    retries = Retry(
-        total=5,
-        backoff_factor=1,
-        status_forcelist=[500, 502, 503, 504],
-        allowed_methods=["GET", "POST"]
-    )
-    adapter = HTTPAdapter(max_retries=retries)
-    session.mount('https://', adapter)
-    session.mount('http://', adapter)
-    return session
 
 # ====== Bot Personality ======
 BOT_NAMES = ["မစ္စတာတီ", "မစ္စတာသန်း", "ကိုသန်း"]
@@ -75,7 +59,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "ဘာမေးမေး မြန်မာလိုပဲ မေးပါ။"
     )
 
-# ====== AI Chat (Hugging Face) ======
+# ====== AI Chat (Groq) ======
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
     bot_name = get_bot_name(user_message)
@@ -83,55 +67,48 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
 
     try:
-        if not HF_TOKEN or HF_TOKEN == "hf_xxxxxxxxxxxxxxxxxxxxxxxxx":
-            await update.message.reply_text("😅 Hugging Face Token မထည့်ရသေးဘူး။ Render မှာ HF_TOKEN ကို ထည့်ပါ။")
-            return
-
         headers = {
-            "Authorization": f"Bearer {HF_TOKEN}".strip(),
+            "Authorization": f"Bearer {GROQ_API_KEY}".strip(),
             "Content-Type": "application/json"
         }
 
-        payload = {
-            "inputs": f"User: {user_message}\nAssistant:",
-            "parameters": {
-                "max_new_tokens": 300,
-                "temperature": 0.8,
-                "do_sample": True
-            }
+        system_prompt = (
+            "သင်ဟာ မစ္စတာသန်း (Mr.T) — funny, friendly, motivational AI Bot ဖြစ်ပါတယ်။ "
+            "Than ကို မိတ်ဆွေလို ပြောပါ။ ရယ်စရာလေးတွေ ထည့်ပါ။ "
+            "အဖြေတွေကို မြန်မာလိုပဲ ပြန်ပါ။ "
+            "Money Mindset Mode: online income, skill တိုးတက်, money mindset, side hustle, motivation, action plan "
+            "အကြံပေးပါ။ Risky trading, guaranteed profit, illegal methods မပြောပါနဲ့။ "
+            "Attractive Personality Mode: self-confidence, communication skill, social skill, relationship advice "
+            "healthy, respectful, confidence-building advice ပေးပါ။ "
+            "Personality: Than ကို motivate လုပ်ပါ။ Funny tone, friendly tone နဲ့ ပြန်ပါ။"
+        )
+
+        data = {
+            "model": MODEL,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ],
+            "max_tokens": 500,
+            "temperature": 0.85
         }
 
-        # ====== Session ကို သုံးပါ ======
-        session = create_session()
-        response = session.post(HF_URL, headers=headers, json=payload, timeout=60)
+        response = requests.post(GROQ_URL, headers=headers, json=data)
         response_data = response.json()
 
-        if response.status_code == 200:
-            if isinstance(response_data, list) and len(response_data) > 0:
-                reply = response_data[0].get("generated_text", "").strip()
-                if "Assistant:" in reply:
-                    reply = reply.split("Assistant:")[-1].strip()
-                elif reply.startswith("User:"):
-                    reply = reply.split("User:")[0].strip()
-                reply = clean_text(reply)
-            else:
-                reply = "အဖြေမရှိပါ"
+        if "choices" in response_data:
+            reply = response_data["choices"][0]["message"]["content"].strip()
+            reply = clean_text(reply)
+
+            if bot_name:
+                reply = f"{bot_name} ပြောတယ်... {reply}"
+
+            await update.message.reply_text(reply, disable_web_page_preview=True)
         else:
-            error_msg = response_data.get("error", "Unknown error")
-            if "rate limit" in str(error_msg).lower():
-                reply = "😅 တစ်ရက်ကို မေးခွန်းအရေအတွက် ပြည့်သွားပြီ။ နောက်နေ့မှ ပြန်မေးပါ။"
-            elif "model" in str(error_msg).lower():
-                reply = f"😅 မော်ဒယ် `{MODEL}` ကို ရှာမတွေ့ပါ။"
-            else:
-                reply = f"😅 Hugging Face error — {str(error_msg)[:100]}"
+            error_msg = response_data.get("error", {}).get("message", "Unknown error")
+            error_msg = clean_text(error_msg)
+            await update.message.reply_text(f"😅 {error_msg}", disable_web_page_preview=True)
 
-        if bot_name:
-            reply = f"{bot_name} ပြောတယ်... {reply}"
-
-        await update.message.reply_text(reply, disable_web_page_preview=True)
-
-    except requests.exceptions.Timeout:
-        await update.message.reply_text("😅 အချိန်လွန်သွားတယ်။ မော်ဒယ်က အိပ်စက်နေလို့ ပြန်နိုးဖို့ စက္ကန့် ၃၀ လောက် ကြာတယ်။ နောက်မှ ပြန်မေးပါ။")
     except Exception as e:
         msg = clean_text(str(e)[:200])
         await update.message.reply_text(f"😅 Error — {msg}", disable_web_page_preview=True)
