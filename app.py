@@ -13,8 +13,7 @@ OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY") or "sk-or-v1-08f58599d
 
 # ====== OpenRouter Settings ======
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL = "meta-llama/llama-3.1-8b-instruct:free"
-
+MODEL = "qwen/qwen-2.5-7b-instruct:free"
 # ====== Flask ======
 flask_app = Flask(__name__)
 
