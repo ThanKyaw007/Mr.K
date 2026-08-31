@@ -13,7 +13,7 @@ DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY") or "sk-a85b8b5818854e4ea2b
 
 # ====== DeepSeek Settings ======
 DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
-MODEL = "deepseek-v4-flash"  # ဈေးသက်သာတယ်
+MODEL = "deepseek-chat"
 
 # ====== Flask ======
 flask_app = Flask(__name__)
