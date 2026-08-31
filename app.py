@@ -14,7 +14,7 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
 # ====== Groq Settings ======
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-MODEL = "deepseek-r1-distill-llama-70b"
+MODEL = "llama-3.1-70b-versatile"  # deepseek model deprecated, safe choice
 
 # ====== Flask ======
 flask_app = Flask(__name__)
@@ -40,7 +40,11 @@ def clean_text(text):
     text = re.sub(r'https?://\S+', '', text)
     text = re.sub(r't\.me/\S+', '', text)
     text = re.sub(r'www\.\S+', '', text)
-    text = re.sub(r'\[.*?\]\(.*?\)', '', text)
+    text = re.sub(r'
+
+\[.*?\]
+
+\(.*?\)', '', text)
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
@@ -69,7 +73,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         headers = {
-            "Authorization": f"Bearer {GROQ_API_KEY}".strip(),  # ← strip() ထည့်ထားတယ်
+            "Authorization": f"Bearer {GROQ_API_KEY}".strip(),
             "Content-Type": "application/json"
         }
 
@@ -98,10 +102,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         response_data = response.json()
 
         if "choices" in response_data:
-                    response = requests.post(GROQ_URL, headers=headers, json=data)
-        response_data = response.json()
-
-        if "choices" in response_data:
             reply = response_data["choices"][0]["message"]["content"].strip()
             reply = clean_text(reply)
 
@@ -111,20 +111,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(reply, disable_web_page_preview=True)
 
         else:
-            # Raw error message from Groq
             error_msg = response_data.get("error", {}).get("message", "Unknown error")
-
-            # Remove links (no preview, no docs URL)
             error_msg = re.sub(r'https?://\S+', '', error_msg)
             error_msg = re.sub(r'www\.\S+', '', error_msg)
 
-            # Special handling for model errors
             if "decommissioned" in error_msg or "does not exist" in error_msg:
                 clean_msg = "မင်းသုံးထားတဲ့ AI model ကို Groq က ပိတ်လိုက်ပြီ သို့မဟုတ် မရှိတော့ဘူး။ Model name ကို ပြန်ပြင်လိုက်ပါနော်။"
             else:
                 clean_msg = f"Groq က error ပေးတယ် — {error_msg.strip()}"
 
             await update.message.reply_text(f"😅 {clean_msg}", disable_web_page_preview=True)
+
+    except Exception as e:
+        msg = str(e)[:100]
+        msg = re.sub(r'https?://\S+', '', msg)
+        msg = re.sub(r'www\.\S+', '', msg)
+        await update.message.reply_text(f"😅 Internal error ဖြစ်နေတယ် — {msg}", disable_web_page_preview=True)
 
 # ====== Run Bot ======
 def run_bot():
@@ -136,10 +138,7 @@ def run_bot():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     print("✅ Bot ready!")
-    
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(app.run_polling(allowed_updates=Update.ALL_TYPES))
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 # ====== Run Flask ======
 def run_flask():
@@ -150,5 +149,4 @@ def run_flask():
 if __name__ == "__main__":
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.start()
-
     run_bot()
