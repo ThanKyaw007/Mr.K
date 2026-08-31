@@ -13,8 +13,8 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 HF_TOKEN = os.environ.get("HF_TOKEN")  # Hugging Face Token
 
 # ====== Hugging Face Settings ======
-HF_URL = "https://api-inference.huggingface.co/models/"
-MODEL = "google/gemma-7b-it"  # ဒါမှမဟုတ် "microsoft/DialoGPT-medium"
+MODEL = "microsoft/DialoGPT-medium"
+HF_URL = f"https://api-inference.huggingface.co/models/{MODEL}"
 
 # ====== Flask ======
 flask_app = Flask(__name__)
