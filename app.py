@@ -1,22 +1,19 @@
 import os
 import threading
 import asyncio
-import requests
 import re
 from flask import Flask
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+import google.generativeai as genai
 
 # ====== API Keys ======
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or "8617869426:AAHzomx_Uikd_S69UxCGAp4avOWUx6ytqVM"
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY") or "sk-a85b8b5818854e4ea2b49fd9fb923fb0"
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") or "YOUR_GEMINI_API_KEY"
 
-# ====== DeepSeek Settings ======
-DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
-# ဈေးသက်သာတဲ့ မော်ဒယ် (အကြံပြုထားတယ်)
-MODEL = "deepseek-v4-flash"
-# ဒါမှမဟုတ် ပိုကောင်းတဲ့ မော်ဒယ်ကို လိုချင်ရင်
-# MODEL = "deepseek-v4-pro"
+# ====== Gemini Settings ======
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel('gemini-2.5-flash')
 
 # ====== Flask ======
 flask_app = Flask(__name__)
@@ -46,6 +43,18 @@ def clean_text(text):
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
+# ====== System Prompt ======
+def get_system_prompt():
+    return """
+    သင်ဟာ မစ္စတာသန်း (Mr.T) — funny, friendly, motivational AI Bot ဖြစ်ပါတယ်။
+    Than ကို မိတ်ဆွေလို ပြောပါ။ ရယ်စရာလေးတွေ ထည့်ပါ။
+    အဖြေတွေကို မြန်မာလိုပဲ ပြန်ပါ။
+    Money Mindset Mode: online income, skill တိုးတက်, money mindset, side hustle, motivation, action plan အကြံပေးပါ။
+    Risky trading, guaranteed profit, illegal methods မပြောပါနဲ့။
+    Attractive Personality Mode: self-confidence, communication skill, social skill, relationship advice ပေးပါ။
+    Personality: Than ကို motivate လုပ်ပါ။ Funny tone, friendly tone နဲ့ ပြန်ပါ။
+    """
+
 # ====== /start ======
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = update.effective_user.first_name
@@ -62,7 +71,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "ဘာမေးမေး မြန်မာလိုပဲ မေးပါ။"
     )
 
-# ====== AI Chat (DeepSeek) ======
+# ====== AI Chat (Gemini) ======
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
     bot_name = get_bot_name(user_message)
@@ -70,47 +79,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
 
     try:
-        headers = {
-            "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
-            "Content-Type": "application/json"
-        }
+        full_prompt = f"{get_system_prompt()}\n\nUser: {user_message}\nAssistant:"
+        response = model.generate_content(full_prompt)
+        reply = response.text.strip()
+        reply = clean_text(reply)
 
-        system_prompt = (
-            "သင်ဟာ မစ္စတာသန်း (Mr.T) — funny, friendly, motivational AI Bot ဖြစ်ပါတယ်။ "
-            "Than ကို မိတ်ဆွေလို ပြောပါ။ ရယ်စရာလေးတွေ ထည့်ပါ။ "
-            "အဖြေတွေကို မြန်မာလိုပဲ ပြန်ပါ။ "
-            "Money Mindset Mode: online income, skill တိုးတက်, money mindset, side hustle, motivation, action plan "
-            "အကြံပေးပါ။ Risky trading, guaranteed profit, illegal methods မပြောပါနဲ့။ "
-            "Attractive Personality Mode: self-confidence, communication skill, social skill, relationship advice "
-            "healthy, respectful, confidence-building advice ပေးပါ။ "
-            "Personality: Than ကို motivate လုပ်ပါ။ Funny tone, friendly tone နဲ့ ပြန်ပါ။"
-        )
+        if bot_name:
+            reply = f"{bot_name} ပြောတယ်... {reply}"
 
-        data = {
-            "model": MODEL,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message}
-            ],
-            "max_tokens": 500,
-            "temperature": 0.85
-        }
-
-        response = requests.post(DEEPSEEK_URL, headers=headers, json=data)
-        response_data = response.json()
-
-        if "choices" in response_data:
-            reply = response_data["choices"][0]["message"]["content"].strip()
-            reply = clean_text(reply)
-
-            if bot_name:
-                reply = f"{bot_name} ပြောတယ်... {reply}"
-
-            await update.message.reply_text(reply, disable_web_page_preview=True)
-        else:
-            error_msg = response_data.get("error", {}).get("message", "Unknown error")
-            error_msg = clean_text(error_msg)
-            await update.message.reply_text(f"😅 {error_msg}", disable_web_page_preview=True)
+        await update.message.reply_text(reply, disable_web_page_preview=True)
 
     except Exception as e:
         msg = clean_text(str(e)[:200])
