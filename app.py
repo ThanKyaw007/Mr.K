@@ -17,6 +17,10 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 ADMIN_ID = 1119128553  # @Thawkhyan999
 ADMIN_PASSWORD = "mysecret123"  # Flask Dashboard Password
 
+# ====== Exchange Rate ======
+# 1 USD = 4545 MMK (based on 10,000 MMK = 2.2 USD)
+EXCHANGE_RATE = 4545  # MMK per USD
+
 # Payment Info
 PAYMENT_INFO = "💳 **ငွေလွှဲရန်**\nKBZPay: 09426419462\nWavePay: 09426419462"
 
@@ -26,6 +30,10 @@ PLAN_LIMITS = {
     "basic": {"limit": 500, "price": 10000},
     "premium": {"limit": 1500, "price": 30000}
 }
+
+# Plan prices in USD (for display)
+def get_price_usd(price_mmk):
+    return round(price_mmk / EXCHANGE_RATE, 2)
 
 BOT_NAMES = ["မစ္စတာသန်း"]
 
@@ -247,6 +255,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/help - အကူအညီ\n\n"
         "💡 သိကောင်းစရာ: အခမဲ့ သုံးချင်ရင် `free` နှိပ်ပါ၊ ပိုမိုအဆင့်မြင့်စွာ လုပ်ဆောင်စေချင်ရင် `basic` သို့မဟုတ် `premium` ကိုရွေးပြီး သုံးပါ။"
     )
+
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "📌 **အသုံးပြုနည်း**\n\n"
@@ -280,9 +289,12 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.commit()
     conn.close()
     
+    price_mmk = PLAN_LIMITS[plan]["price"]
+    price_usd = get_price_usd(price_mmk)
+    
     await update.message.reply_text(
         f"📌 **{plan}** Plan ကို ရွေးလိုက်ပါပြီ။\n"
-        f"💰 စျေးနှုန်း: {PLAN_LIMITS[plan]['price']:,} MMK / month\n\n"
+        f"💰 စျေးနှုန်း: {price_mmk:,} MMK (~${price_usd}) / month\n\n"
         f"📸 ကျေးဇူးပြုပြီး ငွေသွင်း proof screenshot ကို ပို့ပါ။\n\n"
         f"{PAYMENT_INFO}"
     )
@@ -296,11 +308,12 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     plan, usage, proof_status, _, price = user
     limit = PLAN_LIMITS[plan]["limit"]
     remaining = limit - usage
+    price_usd = get_price_usd(price)
     
     await update.message.reply_text(
         f"📊 **Your Status**\n"
         f"📌 Plan: **{plan}**\n"
-        f"💰 စျေးနှုန်း: {price:,} MMK / month\n"
+        f"💰 စျေးနှုန်း: {price:,} MMK (~${price_usd}) / month\n"
         f"📊 သုံးပြီးသား: {usage} / {limit} ကြိမ်\n"
         f"✅ ကျန်သုံးခွင့်: **{remaining}** ကြိမ်\n"
         f"🔍 Proof Status: **{proof_status}**"
