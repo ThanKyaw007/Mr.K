@@ -73,6 +73,8 @@ flask_app = Flask(__name__)
 
 # ====== Flask Routes (ဒီနေရာမှာ စတင်ထည့်ပါ) ======
 
+# ====== Flask Routes ======
+
 @flask_app.route("/")
 def home():
     return "🤖 Bot is running! Visit /admin/proofs for dashboard."
@@ -81,7 +83,6 @@ def home():
 def health():
     return "OK", 200
 
-# 👇 ဒီနေရာမှာ /admin/proofs ကို ထည့်ပါ
 @flask_app.route("/admin/proofs")
 @requires_auth
 def admin_proofs():
@@ -110,16 +111,92 @@ def admin_proofs():
     html += "</table>"
     return html
 
-# 👇 နောက်ထပ် Route တွေကို ဆက်ထည့်ပါ
 @flask_app.route("/admin/users")
 @requires_auth
 def admin_users():
-    # ...
+    conn = sqlite3.connect("bot_users.db")
+    c = conn.cursor()
+    c.execute("SELECT user_id, plan, usage_count, proof_status FROM users ORDER BY user_id")
+    results = c.fetchall()
+    conn.close()
+
+    html = "<h2>👥 User List</h2>"
+    html += "<table border='1' cellpadding='5' style='border-collapse:collapse;'>"
+    html += "<tr><th>User ID</th><th>Plan</th><th>Usage</th><th>Proof Status</th></tr>"
+    
+    for uid, plan, usage, status in results:
+        html += f"<tr><td>{uid}</td><td>{plan}</td><td>{usage}</td><td>{status}</td></tr>"
+    
+    html += "</table>"
+    html += f"<br><p><b>Total Users: {len(results)}</b></p>"
+    return html
 
 @flask_app.route("/admin/stats")
 @requires_auth
 def admin_stats():
-    # ...
+    conn = sqlite3.connect("bot_users.db")
+    c = conn.cursor()
+
+    c.execute("SELECT COUNT(*) FROM users")
+    total_users = c.fetchone()[0]
+
+    c.execute("SELECT plan, COUNT(*) FROM users GROUP BY plan")
+    plan_stats = c.fetchall()
+
+    c.execute("SELECT COUNT(*) FROM users WHERE proof_status='pending'")
+    pending = c.fetchone()[0]
+
+    c.execute("SELECT SUM(usage_count) FROM users")
+    total_usage = c.fetchone()[0] or 0
+
+    conn.close()
+
+    html = "<h2>📊 Bot Statistics</h2>"
+    html += f"<p><b>Total Users:</b> {total_users}</p>"
+    html += f"<p><b>Pending Proofs:</b> {pending}</p>"
+    html += f"<p><b>Total API Calls:</b> {total_usage}</p>"
+    html += "<h3>Plan Distribution</h3><ul>"
+    for plan, count in plan_stats:
+        html += f"<li>{plan}: {count}</li>"
+    html += "</ul>"
+    return html
+
+@flask_app.route("/admin/approve/<user_id>")
+@requires_auth
+def approve_user(user_id):
+    conn = sqlite3.connect("bot_users.db")
+    c = conn.cursor()
+    c.execute("SELECT plan FROM users WHERE user_id=? AND proof_status='pending'", (user_id,))
+    result = c.fetchone()
+    if not result:
+        conn.close()
+        return f"❌ User {user_id} not found or not pending."
+    plan = result[0]
+    price = PLAN_LIMITS[plan]["price"]
+
+    c.execute(
+        "UPDATE users SET proof_status='approved', usage_count=0, price=? WHERE user_id=? AND proof_status='pending'",
+        (price, user_id),
+    )
+    conn.commit()
+    conn.close()
+    return f"✅ User {user_id} upgraded to {plan} Plan!"
+
+@flask_app.route("/admin/reject/<user_id>")
+@requires_auth
+def reject_user(user_id):
+    conn = sqlite3.connect("bot_users.db")
+    c = conn.cursor()
+    c.execute(
+        "UPDATE users SET proof_status='rejected' WHERE user_id=? AND proof_status='pending'",
+        (user_id,),
+    )
+    if c.rowcount == 0:
+        conn.close()
+        return f"❌ User {user_id} not found or not pending."
+    conn.commit()
+    conn.close()
+    return f"❌ User {user_id} proof rejected!"
 
 # ====== ဒီမှာ Flask Routes ပြီးဆုံးပါပြီ ======
 
