@@ -465,7 +465,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🙏 မင်္ဂလာပါ။ ကျွန်တော် မစ္စတာသန်းပါ။\n"
         "သင့်ရဲ့ လက်ထောက် အဖြစ်နဲ့ ကိုယ်ရေးကိုယ်တာ၊ အလုပ်အကိုင်နဲ့ တခြားလုပ်ဆောင်ရမယ့် အရာတွေကို ယုံကြည်စွာ ဖြေရှင်းပေးဖို့ အသင့်ပါဗျ။\n\n"
         "Commands:\n"
-        "/subscribe - Plan ပြောင်းရန် (free/basic/premium/premium_plus)\n"
+        "/subscribe <plan> - Plan ပြောင်းရန် (free/basic/premium/premium_plus)\n"
         "/ask <question> - AI ကို မေးမြန်းရန်\n"
         "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
         "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n"
@@ -482,7 +482,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📌 **အသုံးပြုနည်း**\n\n"
         "/start - ဘော့စတင်\n"
         "/help - အကူအညီ\n"
-        "/subscribe - Plan ပြောင်းရန် (free/basic/premium/premium_plus)\n"
+        "/subscribe <plan> - Plan ပြောင်းရန် (free/basic/premium/premium_plus)\n"
         "/ask <question> - AI ကို မေးမြန်းရန်\n"
         "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
         "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n"
@@ -520,6 +520,14 @@ async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    plan = context.args[0] if context.args else "free"
+    
+    if plan not in PLAN_LIMITS:
+        allowed = ", ".join(PLAN_LIMITS.keys())
+        await update.message.reply_text(f"❌ '{plan}' မရှိပါ။ ရနိုင်တဲ့ Plan: {allowed}")
+        return
+    
     keyboard = [
         [InlineKeyboardButton("📌 Free", callback_data="sub_free")],
         [InlineKeyboardButton("⭐ Basic (10,000 MMK)", callback_data="sub_basic")],
@@ -653,6 +661,7 @@ async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text(answer, disable_web_page_preview=True)
 
+# ====== Profile & Habits ======
 async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     
@@ -680,14 +689,13 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
     key = field_map.get(field_raw)
     if not key:
-        await update.message.reply_text(
-            "❌ field မမှန်ပါ။ goals/weaknesses/dream/career/money_mindset/relationship ထဲက တစ်ခုသုံးပါ။"
-        )
+        await update.message.reply_text("❌ field မမှန်ပါ။ goals/weaknesses/dream/career/money_mindset/relationship ထဲက တစ်ခုသုံးပါ။")
         return
     
     update_profile(user_id, key, value)
     await update.message.reply_text(f"✅ `{key}` ကို update လုပ်ပြီးပါပြီ။")
 
+# ====== Habit Commands ======
 async def habit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     if not context.args:
@@ -695,9 +703,13 @@ async def habit(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Usage: /habit <habit>\nExample: /habit နေ့တိုင်း ၃၀ မိနစ်စာဖတ်မယ်"
         )
         return
+
     habit_text = " ".join(context.args)
     add_habit(user_id, habit_text)
-    await update.message.reply_text(f"✅ Habit သိမ်းပြီးပါပြီ:\n- {habit_text}")
+
+    await update.message.reply_text(
+        f"✅ Habit သိမ်းပြီးပါပြီ:\n- {habit_text}"
+    )
 
 async def myhabits(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
@@ -705,20 +717,23 @@ async def myhabits(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not habits:
         await update.message.reply_text("📭 Habit မရှိသေးပါ။ /habit နဲ့ အသစ်ထည့်ပါ။")
         return
+
     lines = ["📋 **Your Recent Habits**"]
     for h, ts in habits:
         lines.append(f"• {h} ({ts[:10]})")
+
     await update.message.reply_text("\n".join(lines))
 
+# ====== Proof System ======
 async def proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
-    message = update.message
 
-    if not message.photo:
-        await message.reply_text("📸 Screenshot proof ကို Photo အနေနဲ့ပို့ပါ။")
+    if not update.message.photo:
+        await update.message.reply_text("📸 Proof ကို Photo အနေနဲ့ပို့ပါ။")
         return
 
-    file_id = message.photo[-1].file_id
+    file_id = update.message.photo[-1].file_id
+
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
     c.execute(
@@ -728,23 +743,23 @@ async def proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.commit()
     conn.close()
 
-    await message.reply_text("✅ Proof ကို လက်ခံပြီးပါပြီ။ Admin က စစ်ဆေးပြီး approve/reject လုပ်ပေးမယ်။")
-    
-    # Notify admins
+    await update.message.reply_text("✅ Proof လက်ခံပြီးပါပြီ။ Admin စစ်ဆေးနေပါမယ်။")
+
+    # Notify admin
     for admin_id in ADMIN_IDS:
         try:
-            await context.bot.send_message(
-                chat_id=admin_id,
-                text=f"📋 User {user_id} က Proof တင်လိုက်ပါပြီ။"
-            )
             await context.bot.send_photo(
                 chat_id=admin_id,
                 photo=file_id,
-                caption=f"Proof from User {user_id}\nApprove: /approve_proof {user_id}\nReject: /reject_proof {user_id}"
+                caption=f"📋 Proof from User {user_id}\nApprove: /approve_proof {user_id}\nReject: /reject_proof {user_id}"
             )
-        except Exception as e:
-            logger.error(f"Admin notify error: {e}")
+        except:
+            pass
 
+async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await proof(update, context)
+
+# ====== Admin Commands ======
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in ADMIN_IDS:
         await update.message.reply_text("❌ Admin only!")
@@ -907,7 +922,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(answer, disable_web_page_preview=True)
 
-# ====== Main Function ======
+# ====== Main ======
 def main():
     init_db()
     
@@ -933,8 +948,8 @@ def main():
     application.add_handler(CommandHandler("reject_proof", reject_proof))
 
     # ----- Non-Command Handlers -----
+    application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     application.add_handler(CallbackQueryHandler(button_handler))
-    application.add_handler(MessageHandler(filters.PHOTO, proof))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     # ----- Scheduler Thread -----
