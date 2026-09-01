@@ -9,7 +9,7 @@ import logging
 import schedule
 import time
 from datetime import datetime
-from flask import Flask, request, Response
+from flask import Flask, request, Response, send_file   
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
