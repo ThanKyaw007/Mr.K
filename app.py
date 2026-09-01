@@ -29,7 +29,7 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or "8617869426:AAHzomx
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY") or "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"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-ADMIN_IDS = [1119128553]  # @Thawkhyan999
+ADMIN_IDS = [1119128553]
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "mysecret123")
 
 EXCHANGE_RATE = 4545
@@ -40,7 +40,7 @@ PLAN_LIMITS = {
     "free": {"limit": 50, "price": 0},
     "basic": {"limit": 500, "price": 10000},
     "premium": {"limit": 1500, "price": 30000},
-    "premium_plus": {"limit": 5000, "price": 50000}  # VIP Coaching Plan
+    "premium_plus": {"limit": 5000, "price": 50000}
 }
 
 def get_price_usd(price_mmk):
@@ -399,7 +399,6 @@ async def ask_model(prompt):
             raise Exception("Unexpected API response: " + str(result))
 
 async def send_daily_coaching(bot):
-    """Send daily coaching message to all premium_plus users"""
     try:
         conn = sqlite3.connect("bot_users.db")
         c = conn.cursor()
@@ -822,15 +821,15 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             await context.bot.send_message(
                 chat_id=admin_id,
-                text=f"📋 User {user_id} က Proof တင်လိုက်ပါပြီ။\n⏰ {timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
+                text=f"📋 User {user_id} က Proof တင်လိုက်ပါပြီ။"
             )
             await context.bot.send_photo(
                 chat_id=admin_id,
                 photo=photo,
-                caption=f"Proof from User {user_id}\n\nအတည်ပြုရန်: /approve_proof {user_id}\nပယ်ရန်: /reject_proof {user_id}"
+                caption=f"Proof from User {user_id}\nApprove: /approve_proof {user_id}\nReject: /reject_proof {user_id}"
             )
         except Exception as e:
-            logger.error(f"Admin notification error for {admin_id}: {e}")
+            logger.error(f"Admin notify error: {e}")
 
 async def pending_proofs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in ADMIN_IDS:
@@ -940,13 +939,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(answer, disable_web_page_preview=True)
 
-# ====== Main ======
+# ====== Main Application Setup ======
 def main():
     init_db()
     
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-    
-    # Add all handlers
+
+    # ----- User Commands -----
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("subscribe", subscribe))
@@ -956,28 +955,30 @@ def main():
     app.add_handler(CommandHandler("profile", profile))
     app.add_handler(CommandHandler("habit", habit))
     app.add_handler(CommandHandler("myhabits", myhabits))
+
+    # ----- Admin Commands -----
     app.add_handler(CommandHandler("broadcast", broadcast))
     app.add_handler(CommandHandler("verify", verify))
     app.add_handler(CommandHandler("pending_proofs", pending_proofs))
     app.add_handler(CommandHandler("approve_proof", approve_proof))
     app.add_handler(CommandHandler("reject_proof", reject_proof))
-    app.add_handler(CallbackQueryHandler(button_handler))
+
+    # ----- Non-Command Handlers -----
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    
-    logger.info("🤖 Bot ready and polling started!")
-    
-    # Scheduler thread with bot instance
+
+    # ----- Scheduler & Flask Threads -----
     scheduler_thread = threading.Thread(target=run_scheduler, args=(app.bot,), daemon=True)
     scheduler_thread.start()
     logger.info("🔄 Scheduler thread started.")
-    
-    # Flask thread
+
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
     logger.info("🌐 Flask server thread started.")
-    
-    # Run bot
+
+    # ----- Start Bot -----
+    logger.info("🤖 Bot ready and polling started!")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 def run_flask():
