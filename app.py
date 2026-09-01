@@ -9,7 +9,7 @@ import logging
 import schedule
 import time
 from datetime import datetime
-from flask import Flask, request, Response, send_file   
+from flask import Flask, request, Response, send_file
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -41,9 +41,8 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "mysecret123")
 
 # ====== Multi-Admin Users (Username + Password) ======
 ADMIN_USERS = {
-    "admin": "mysecret123",       # ခင်ဗျား
-    "thawkhyan": "yourpass123",   # ခင်ဗျားရဲ့ အမည်
-    # နောက်ထပ် Admin တွေ ထပ်ထည့်နိုင်ပါတယ်
+    "admin": "mysecret123",
+    "thawkhyan": "yourpass123",
 }
 
 EXCHANGE_RATE = 4545
@@ -177,8 +176,6 @@ def admin_stats():
     html += "</ul>"
     return html
 
-from flask import send_file
-
 @flask_app.route("/download_db")
 @requires_auth
 def download_db():
@@ -233,7 +230,6 @@ def get_bot_name(text):
             return name
     return None
 
-
 def clean_text(text):
     text = re.sub(r"https?://\S+", "", text)
     text = re.sub(r"t\.me/\S+", "", text)
@@ -242,17 +238,15 @@ def clean_text(text):
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 
-import schedule
-import time
-from datetime import datetime
-
+# ====== Database Backup Function (ပြင်ဆင်ပြီး) ======
 def backup_and_send(bot):
     """Database ကို Backup လုပ်ပြီး Admin ဆီပို့မယ်"""
     try:
-        # ၁။ Database ကို Backup လုပ်ပါ
+        # ၁။ Database ကို Backup လုပ်ပါ (ဒီနည်းက အလုပ်လုပ်တယ်)
         conn = sqlite3.connect("bot_users.db")
-        c = conn.cursor()
-        c.execute(".backup bot_users_backup.db")  # SQLite backup
+        with open("bot_users_backup.db", "w") as f:
+            for line in conn.iterdump():
+                f.write(f"{line}\n")
         conn.close()
         
         # ၂။ Backup ဖိုင်ကို Admin ဆီပို့ပါ
@@ -263,15 +257,12 @@ def backup_and_send(bot):
                 caption=f"📦 Database Backup - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
             )
         
-        # ၃။ သိမ်းထားတဲ့ Backup ဖိုင်ကို ဖျက်ပါ (နေရာလွတ်အောင်)
+        # ၃။ သိမ်းထားတဲ့ Backup ဖိုင်ကို ဖျက်ပါ
         os.remove("bot_users_backup.db")
         
         logger.info("✅ Database backup sent to admin")
     except Exception as e:
         logger.error(f"❌ Backup error: {e}")
-
-# Scheduler မှာ ထည့်ပါ (ဥပမာ - မနက် ၃ နာရီမှာ တစ်ခါ)
-schedule.every().day.at("03:00").do(lambda: asyncio.run(backup_and_send(application.bot)))
 
 # ====== Database Functions ======
 def init_db():
@@ -610,12 +601,16 @@ async def send_daily_coaching(bot):
         logger.error(f"❌ Daily coaching error: {e}")
 
 
-# ====== Scheduler ======
+# ====== Scheduler (ပြင်ဆင်ပြီး) ======
 def run_scheduler(bot):
     schedule.every(30).days.do(reset_usage)
     schedule.every().day.at("08:00").do(lambda: asyncio.run(send_daily_coaching(bot)))
+    
+    # 👇 ဒီမှာ Backup schedule ကို ထည့်ပါ
+    schedule.every().day.at("03:00").do(lambda: asyncio.run(backup_and_send(bot)))
+    
     logger.info(
-        "⏰ Scheduler started. Reset usage every 30 days, daily coaching at 8:00 AM."
+        "⏰ Scheduler started. Reset usage every 30 days, daily coaching at 8:00 AM, backup at 3:00 AM."
     )
 
     while True:
