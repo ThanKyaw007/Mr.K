@@ -236,7 +236,7 @@ def backup_and_send(bot):
         
         with open("bot_users_backup.db", "rb") as f:
             bot.send_document(
-                chat_id=ADMIN_IDS[0],  # Fixed Bug
+                chat_id=ADMIN_IDS[0],
                 document=f,
                 caption=f"📦 Database Backup - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
             )
@@ -386,11 +386,8 @@ def reset_usage():
     except Exception as e:
         logger.error(f"❌ Usage reset error: {e}")
 
-# ====== Local Responses (ပိုက်ဆံချွေတာရန် - ရိုးရှင်းသောမေးခွန်းများအတွက်) ======
-# ဒီနေရာမှာ အသုံးပြုသူတွေ အမေးများဆုံး မေးခွန်းတွေကို ထည့်ပါ။
-# အာက်ပါစာသားတွေကို မင်းရဲ့ Code ထဲက LOCAL_RESPONSES ထဲမှာ အစားထိုးလိုက်ပါ။
+# ====== Local Responses (ပိုက်ဆံချွေတာရန်) ======
 LOCAL_RESPONSES = {
-    # --- Greetings / အခြေခံ နှုတ်ဆက်ခြင်း ---
     "hello": "ဟယ်လို! မင်္ဂလာပါဗျ။ ဘာကူညီပေးရမလဲ?",
     "hi": "ဟိုင်း! ဒီနေ့ ဘာတွေ လုပ်နေလဲဗျ။",
     "ဟိုင်း": "ဟိုင်း! ဘာမေးချင်လဲဗျ။",
@@ -399,26 +396,21 @@ LOCAL_RESPONSES = {
     "ဘာလုပ်နေလဲ": "ခင်ဗျားကို ကူညီဖို့ စောင့်နေတာပေါ့ဗျာ။",
     "အိမ်မှာလား": "ဟုတ်ကဲ့ဗျ၊ ဒီမှာပါပဲ။ ဘာမေးချင်လဲဗျ။",
     "ဘယ်လိုလဲ": "ကျွန်တော်ကတော့ အဆင်ပြေပါတယ်ဗျ။ ခင်ဗျားကရော?",
-    "အားလုံးအဆင်ပြေလား": "အားလုံး အဆင်ပြေပါတယ်ဗျ။ ခင်ဗျားရော ဘာတွေများ ဖြစ်နေလဲ။",
     "စားပြီးပြီလား": "ရပါတယ်ဗျ။ မင်းစားပြီးပြီလား?",
-
-    # --- Thanks / ကျေးဇူးတင်ခြင်း ---
     "thanks": "ရပါတယ်ဗျ။ ကျေးဇူးတင်ပါတယ်။",
     "thank you": "ရပါတယ်ဗျ။ ကျေးဇူးတင်ပါတယ်။",
     "ကျေးဇူးတင်ပါတယ်": "အေးပါဗျ။ အားမနာပါနဲ့။",
     "ကျေးဇူး": "အေးပါဗျ။ ကျေးဇူးတင်ပါတယ်။",
     "အဆင်ပြေပါတယ်": "ဝမ်းသာပါတယ်ဗျ။",
-
-    # --- Basic Confirmation / အခြေခံ အဖြေများ ---
     "အင်း": "အင်း ဟုတ်ကဲ့ဗျ။",
     "ဟုတ်": "ဟုတ်ပါတယ်ဗျ။",
     "မဟုတ်ဘူး": "မဟုတ်ဘူးဆိုတော့ ဘာဖြစ်လဲဗျ။",
     "အိုကေ": "အိုကေပါဗျ။",
     "ok": "Okay ပါဗျ။",
+    "ကောင်းပြီ": "ကောင်းပါပြီဗျ။",
     "သိပြီ": "သိရင် ဝမ်းသာပါတယ်ဗျ။",
     "မသိဘူး": "မသိရင် ဘာကို သိချင်တာလဲဗျ။",
-
-    # --- Bot Identity & Help / ဘော့အကြောင်း ---
+    "ရပါတယ်": "ရပါတယ်ဗျ။",
     "ဘယ်သူလဲ": "ကျွန်တော်က မစ္စတာသန်း (Mr.T) ပါ။ ခင်ဗျားရဲ့ ကိုယ်ပိုင်အကြံပေးဘော့ပါ။",
     "မင်းကဘာလဲ": "ကျွန်တော်က မစ္စတာသန်း (Mr.T) ပါ။ ခင်ဗျားရဲ့ ကိုယ်ပိုင်အကြံပေးဘော့ပါ။",
     "ဘာလုပ်ပေးနိုင်လဲ": "လုပ်ငန်း၊ နည်းပညာ၊ စိုက်ပျိုးရေး၊ ဗီဒီယို၊ စီးပွားရေး အပါအဝင် အကြံဉာဏ် (၁၆) မျိုး ပေးနိုင်ပါတယ်ဗျ။",
@@ -428,8 +420,6 @@ LOCAL_RESPONSES = {
     "အမိန့်": "Command တွေကို /help မှာ ကြည့်နိုင်ပါတယ်ဗျ။",
     "command": "Command တွေကို /help မှာ ကြည့်နိုင်ပါတယ်ဗျ။",
     "စတင်မယ်": "စတင်လိုက်ပါပြီဗျ။ ဘာမေးမလဲ။",
-
-    # --- Subscription & Pricing / Plan နှင့် ပိုက်ဆံ ---
     "price": "Plan ဈေးနှုန်းတွေကို /subscribe နှိပ်ပြီး ကြည့်နိုင်ပါတယ်ဗျ။",
     "စျေးနှုန်း": "စျေးနှုန်းတွေ သိချင်ရင် /subscribe နှိပ်ပါဗျ။",
     "plan": "Plan တွေက Free, Basic, Premium နဲ့ Premium+ ရှိပါတယ်။ /subscribe နှိပ်ပါ။",
@@ -441,9 +431,6 @@ LOCAL_RESPONSES = {
     "ဝယ်မယ်": "ဝယ်ချင်ရင် /subscribe နှိပ်ပြီး Plan ရွေးပါ။",
     "proof": "ငွေလွှဲပြီးရင် Screenshot ကို ဒီထဲ Photo ပို့ပါ။",
     "ပြေစာ": "ပြေစာဓာတ်ပုံကို ပို့ပေးပါ။",
-
-    # --- Domain Intro / နယ်ပယ်အလိုက် အခြေခံ ---
-    # နက်ရှိုင်းတဲ့ အသေးစိတ် လိုချင်ရင် /ask နဲ့ မေးဖို့ ညွှန်ပြထားပါတယ်။
     "ဗီဒီယိုဖန်တီးနည်း": "ဗီဒီယိုဖန်တီးနည်းအသေးစိတ်၊ Software အကြံပြုချက်တွေကို /ask နဲ့ မေးကြည့်နိုင်ပါတယ်ဗျ။",
     "video editing": "Video editing အကြောင်း သိချင်ရင် /ask မှာ မေးပါ။",
     "capcut": "CapCut အကြောင်း သိချင်ရင် /ask မှာ မေးပါ။",
@@ -451,12 +438,7 @@ LOCAL_RESPONSES = {
     "စိုက်ပျိုးနည်း": "စိုက်ပျိုးနည်းအသေးစိတ်ကို /ask နဲ့ မေးပါ။",
     "ကြက်မွေးနည်း": "ကြက်မွေးနည်းအသေးစိတ်ကို /ask နဲ့ မေးပါ။",
     "ကွန်ပျူတာပြဿနာ": "ကွန်ပျူတာပြဿနာရှိရင် /ask နဲ့ မေးကြည့်ပါဗျ။",
-    "နည်းပညာ": "နည်းပညာအကြံဉာဏ်တွေ လိုချင်ရင် /ask နဲ့ မေးပါ။",
-    
-    # --- Common Phrases / အသုံးများသော စကားစုများ ---
-    "မင်္ဂလာညနေခင်းပါ": "မင်္ဂလာညနေခင်းပါဗျ။ ဒီနေ့ ဘာလုပ်မလဲ။",
-    "ကောင်းပြီ": "ကောင်းပါပြီဗျ။",
-    "ရပါတယ်": "ရပါတယ်ဗျ။",
+    "နည်းပညာ": "နည်းပညာအကြံဉာဏ်တွေ လိုချင်ရင် /ask နဲ့ မေးပါ။"
 }
 
 def get_local_response(user_text):
@@ -494,7 +476,6 @@ async def ask_model(prompt: str, user_id: str = None) -> str:
                 if money_mindset: user_context += f"- ငွေကြေးစိတ်ဓာတ်: {money_mindset}\n"
                 if relationship: user_context += f"- ဆက်ဆံရေး: {relationship}\n"
 
-    # 1️⃣ DeepSeek ကို အရင်စမ်းမယ်
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(
@@ -511,8 +492,6 @@ async def ask_model(prompt: str, user_id: str = None) -> str:
                 raise Exception("Unexpected API response: " + str(result))
     except Exception as e:
         logger.error(f"DeepSeek failed: {e}. Falling back to GPT-4o-mini.")
-        
-        # 2️⃣ DeepSeek မရရင် GPT-4o-mini ကို Fallback သုံးမယ်
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(
                 OPENROUTER_URL,
@@ -560,7 +539,7 @@ def run_scheduler(bot):
     schedule.every(30).days.do(reset_usage)
     schedule.every().day.at("08:00").do(lambda: asyncio.run(send_daily_coaching(bot)))
     schedule.every().day.at("03:00").do(lambda: asyncio.run(backup_and_send(bot)))
-    logger.info("⏰ Scheduler started. Reset usage every 30 days, daily coaching at 8:00 AM, backup at 3:00 AM.")
+    logger.info("⏰ Scheduler started.")
     while True:
         schedule.run_pending()
         time.sleep(60)
@@ -568,18 +547,15 @@ def run_scheduler(bot):
 # ====== Telegram Bot Command Handlers ======
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
-
     if context.args:
         ref_code = context.args[0]
         if ref_code.startswith("REF"):
             inviter_id = ref_code.replace("REF", "")
             if inviter_id != user_id:
                 give_referral_reward(inviter_id, user_id)
-
     user = get_user(user_id)
     if not user:
         add_user(user_id, "free")
-
     await update.message.reply_text(
         "🙏 မင်္ဂလာပါ။ ကျွန်တော် မစ္စတာသန်းပါ။\n"
         "သင့်ရဲ့ လက်ထောက် အဖြစ်နဲ့ ကိုယ်ရေးကိုယ်တာ၊ အလုပ်အကိုင်နဲ့ "
@@ -676,14 +652,11 @@ async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ မေးခွန်းထည့်ပေးပါ။\nUsage: /ask <your question>")
         return
     question = " ".join(context.args)
-    
-    # Local အရင်စစ်
     local_answer = get_local_response(question)
     if local_answer:
         increment_usage(user_id)
         await update.message.reply_text(local_answer)
         return
-    
     await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
     try:
         answer = await ask_model(question, user_id)
