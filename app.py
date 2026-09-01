@@ -5,21 +5,35 @@ import threading
 import asyncio
 import httpx
 import functools
+import logging
+import schedule
+import time
 from flask import Flask, request, Response
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+
+# ====== Logging Configuration ======
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("bot_errors.log"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # ====== Configuration ======
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or "8617869426:AAHzomx_Uikd_S69UxCGAp4avOWUx6ytqVM"
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY") or "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"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-ADMIN_ID = 1119128553  # @Thawkhyan999
-ADMIN_PASSWORD = "mysecret123"  # Flask Dashboard Password
+# ====== Multi-Admin Support (Feature 1) ======
+ADMIN_IDS = [1119128553]  # @Thawkhyan999 - နောက်ထပ် Admin ID တွေ ထပ်ထည့်နိုင်ပါတယ်
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "mysecret123")  # Feature 4: Env Password
 
 # ====== Exchange Rate ======
-# 1 USD = 4545 MMK (based on 10,000 MMK = 2.2 USD)
-EXCHANGE_RATE = 4545  # MMK per USD
+EXCHANGE_RATE = 4545  # MMK per USD (10,000 MMK = 2.2 USD)
 
 # Payment Info
 PAYMENT_INFO = "💳 **ငွေလွှဲရန်**\nKBZPay: 09426419462\nWavePay: 09426419462"
@@ -31,7 +45,6 @@ PLAN_LIMITS = {
     "premium": {"limit": 1500, "price": 30000}
 }
 
-# Plan prices in USD (for display)
 def get_price_usd(price_mmk):
     return round(price_mmk / EXCHANGE_RATE, 2)
 
@@ -95,18 +108,23 @@ def admin_proofs():
 def approve_user(user_id):
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
-    price = PLAN_LIMITS["premium"]["price"]
-    c.execute("""
-        UPDATE users 
-        SET proof_status='approved', plan='premium', usage_count=0, price=? 
-        WHERE user_id=? AND proof_status='pending'
-    """, (price, user_id))
-    if c.rowcount == 0:
+    # Feature 2: Plan Respect - User ရဲ့ Plan ကို လေးစားမယ် (premium ပဲပေးတာမဟုတ်ဘူး)
+    c.execute("SELECT plan FROM users WHERE user_id=? AND proof_status='pending'", (user_id,))
+    result = c.fetchone()
+    if not result:
         conn.close()
         return f"❌ User {user_id} not found or not pending."
+    plan = result[0]
+    price = PLAN_LIMITS[plan]["price"]
+    
+    c.execute("""
+        UPDATE users 
+        SET proof_status='approved', usage_count=0, price=? 
+        WHERE user_id=? AND proof_status='pending'
+    """, (price, user_id))
     conn.commit()
     conn.close()
-    return f"✅ User {user_id} upgraded to Premium Plan!"
+    return f"✅ User {user_id} upgraded to {plan} Plan!"
 
 @flask_app.route('/admin/reject/<user_id>')
 @requires_auth
@@ -162,6 +180,7 @@ def init_db():
         pass
     conn.commit()
     conn.close()
+    logger.info("✅ Database initialized successfully.")
 
 def add_user(user_id, plan="free"):
     conn = sqlite3.connect("bot_users.db")
@@ -198,6 +217,26 @@ def increment_usage(user_id):
     c.execute("UPDATE users SET usage_count = usage_count + 1 WHERE user_id=?", (user_id,))
     conn.commit()
     conn.close()
+
+# ====== Feature 3: Monthly Usage Reset ======
+def reset_usage():
+    try:
+        conn = sqlite3.connect("bot_users.db")
+        c = conn.cursor()
+        c.execute("UPDATE users SET usage_count = 0")
+        conn.commit()
+        conn.close()
+        logger.info("✅ Monthly usage reset completed successfully.")
+    except Exception as e:
+        logger.error(f"❌ Usage reset error: {e}")
+
+def run_scheduler():
+    # 30 ရက်တစ်ခါ reset လုပ်မယ်
+    schedule.every(30).days.do(reset_usage)
+    logger.info("⏰ Scheduler started. Will reset usage every 30 days.")
+    while True:
+        schedule.run_pending()
+        time.sleep(60)
 
 # ====== OpenRouter AI Call ======
 system_prompt = (
@@ -253,7 +292,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
         "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n"
         "/help - အကူအညီ\n\n"
-        "💡 သိကောင်းစရာ: အခမဲ့ သုံးချင်ရင် `free` နှိပ်ပါ၊ ပိုမိုအဆင့်မြင့်စွာ လုပ်ဆောင်စေချင်ရင် `basic` သို့မဟုတ် `premium` ကိုရွေးပြီး သုံးပါ။"
+        "💡 သိကောင်းစရာ: အခမဲ့ သုံးချင်ရင် `/subscribe free` ကိုရွေးပါ၊ ပိုမိုအဆင့်မြင့်စွာ လုပ်ဆောင်စေချင်ရင် `basic` သို့မဟုတ် `premium` ကိုရွေးပြီး သုံးပါ။"
     )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -340,6 +379,7 @@ async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
         answer = await ask_model(question)
         answer = clean_text(answer)
     except Exception as e:
+        logger.error(f"Ask command error for user {user_id}: {e}")
         await update.message.reply_text(f"⚠️ Error: {str(e)[:100]}")
         return
     
@@ -352,7 +392,7 @@ async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(answer, disable_web_page_preview=True)
 
 async def verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
+    if update.effective_user.id not in ADMIN_IDS:
         await update.message.reply_text("❌ Admin only command!")
         return
     
@@ -394,21 +434,23 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text("📸 Proof လက်ခံပြီးပါပြီ။ Admin စစ်ဆေးနေပါမယ်။")
     
-    try:
-        await context.bot.send_message(
-            chat_id=ADMIN_ID,
-            text=f"📋 User {user_id} က Proof တင်လိုက်ပါပြီ။"
-        )
-        await context.bot.send_photo(
-            chat_id=ADMIN_ID,
-            photo=photo,
-            caption=f"Proof from User {user_id}\n\nအတည်ပြုရန်: /approve_proof {user_id}\nပယ်ရန်: /reject_proof {user_id}"
-        )
-    except Exception as e:
-        print(f"⚠️ Admin notification error: {e}")
+    # Feature 1: Multi-Admin Support - Admin အားလုံးကို တစ်ပြိုင်နက် အကြောင်းကြားမယ်
+    for admin_id in ADMIN_IDS:
+        try:
+            await context.bot.send_message(
+                chat_id=admin_id,
+                text=f"📋 User {user_id} က Proof တင်လိုက်ပါပြီ။"
+            )
+            await context.bot.send_photo(
+                chat_id=admin_id,
+                photo=photo,
+                caption=f"Proof from User {user_id}\n\nအတည်ပြုရန်: /approve_proof {user_id}\nပယ်ရန်: /reject_proof {user_id}"
+            )
+        except Exception as e:
+            logger.error(f"Admin notification error for {admin_id}: {e}")
 
 async def pending_proofs(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
+    if update.effective_user.id not in ADMIN_IDS:
         await update.message.reply_text("❌ Admin only!")
         return
     conn = sqlite3.connect("bot_users.db")
@@ -425,18 +467,27 @@ async def pending_proofs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 async def approve_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
+    if update.effective_user.id not in ADMIN_IDS:
         await update.message.reply_text("❌ Admin only!")
         return
     if not context.args:
         await update.message.reply_text("Usage: /approve_proof <user_id>")
         return
+    
     target_user = context.args[0]
+    
+    # Feature 2: Plan Respect - User ရွေးထားတဲ့ Plan ကို လေးစားမယ်
+    user_data = get_user(target_user)
+    if not user_data:
+        await update.message.reply_text(f"❌ User `{target_user}` မတွေ့ပါ။")
+        return
+    plan, _, _, _, _ = user_data
+    price = PLAN_LIMITS[plan]["price"]
+    
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
-    price = PLAN_LIMITS["premium"]["price"]
     c.execute("""UPDATE users 
-                 SET proof_status='approved', plan='premium', usage_count=0, price=? 
+                 SET proof_status='approved', usage_count=0, price=? 
                  WHERE user_id=? AND proof_status='pending'""",
               (price, target_user))
     if c.rowcount == 0:
@@ -445,15 +496,16 @@ async def approve_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     conn.commit()
     conn.close()
-    await update.message.reply_text(f"✅ User `{target_user}` Premium သို့ အဆင့်မြှင့်ပြီးပါပြီ။")
+    
+    await update.message.reply_text(f"✅ User `{target_user}` ရဲ့ Proof အတည်ပြုပြီး **{plan}** Plan ကို အဆင့်မြှင့်ပေးလိုက်ပါပြီ။")
     try:
         await context.bot.send_message(chat_id=int(target_user),
-                                       text="🎉 သင့် Proof အတည်ပြုပြီး Premium Plan ရရှိပါပြီ။")
-    except Exception:
-        pass
+                                       text=f"🎉 သင့် Proof အတည်ပြုပြီး **{plan}** Plan ရရှိပါပြီ။")
+    except Exception as e:
+        logger.error(f"Failed to notify user {target_user}: {e}")
 
 async def reject_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
+    if update.effective_user.id not in ADMIN_IDS:
         await update.message.reply_text("❌ Admin only!")
         return
     if not context.args:
@@ -473,8 +525,8 @@ async def reject_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await context.bot.send_message(chat_id=int(target_user),
                                        text="⚠️ သင့် Proof ကို ငြင်းပယ်ခံရပါသည်။ ပြန်လည်တင်ပေးပါ။")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"Failed to notify user {target_user}: {e}")
 
 # ====== Auto Subscribe via text message ======
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -496,6 +548,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         answer = await ask_model(original_text)
         answer = clean_text(answer)
     except Exception as e:
+        logger.error(f"Handle message error for user {user_id}: {e}")
         await update.message.reply_text(f"⚠️ Error: {str(e)[:100]}")
         return
     
@@ -508,7 +561,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ====== Run Bot ======
 def run_bot():
-    print("🤖 Bot starting...")
+    logger.info("🤖 Bot starting...")
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     
     app.add_handler(CommandHandler("start", start))
@@ -523,7 +576,7 @@ def run_bot():
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    print("✅ Bot ready!")
+    logger.info("✅ Bot ready and polling started!")
     
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -537,6 +590,16 @@ def run_flask():
 # ====== Main ======
 if __name__ == "__main__":
     init_db()
-    flask_thread = threading.Thread(target=run_flask)
+    
+    # Feature 3: Monthly Reset Scheduler (Background Thread)
+    scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
+    scheduler_thread.start()
+    logger.info("🔄 Scheduler thread started.")
+    
+    # Flask Thread
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
+    logger.info("🌐 Flask server thread started.")
+    
+    # Run Bot (Main Thread)
     run_bot()
