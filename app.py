@@ -4,6 +4,7 @@ import sqlite3
 import threading
 import asyncio
 import httpx
+import functools  # <-- ထည့်ထားပါတယ်
 from flask import Flask, request, Response
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -28,7 +29,7 @@ BOT_NAMES = ["မစ္စတာသန်း"]
 # ====== Flask App ======
 flask_app = Flask(__name__)
 
-# ====== Flask Auth ======
+# ====== Flask Auth (ပြင်ဆင်ပြီး) ======
 def check_auth(password):
     return password == ADMIN_PASSWORD
 
@@ -39,6 +40,7 @@ def authenticate():
     )
 
 def requires_auth(f):
+    @functools.wraps(f)  # <-- ဒီလို wrap လုပ်ထားပါတယ်
     def decorated(*args, **kwargs):
         auth = request.authorization
         if not auth or not check_auth(auth.password):
@@ -88,6 +90,9 @@ def approve_user(user_id):
         SET proof_status='approved', plan='premium', usage_count=0, price=? 
         WHERE user_id=? AND proof_status='pending'
     """, (price, user_id))
+    if c.rowcount == 0:
+        conn.close()
+        return f"❌ User {user_id} not found or not pending."
     conn.commit()
     conn.close()
     return f"✅ User {user_id} upgraded to Premium Plan!"
@@ -98,6 +103,9 @@ def reject_user(user_id):
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
     c.execute("UPDATE users SET proof_status='rejected' WHERE user_id=? AND proof_status='pending'", (user_id,))
+    if c.rowcount == 0:
+        conn.close()
+        return f"❌ User {user_id} not found or not pending."
     conn.commit()
     conn.close()
     return f"❌ User {user_id} proof rejected!"
