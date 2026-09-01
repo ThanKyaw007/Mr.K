@@ -242,7 +242,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/subscribe <plan> - Plan ပြောင်းရန် (free/basic/premium)\n"
         "/ask <question> - AI ကို မေးမြန်းရန်\n"
         "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
-        "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n"
         "/help - အကူအညီ\n\n"
         "💡 သိကောင်းစရာ: `free`, `basic`, `premium` လို့ရိုက်ရင် အလိုအလျောက် subscribe လုပ်ပေးမယ်။"
     )
@@ -364,157 +363,121 @@ async def verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(f"✅ User {target_user} upgraded to {plan} plan!")
 
-# ====== Proof System (with Notification) ======
+# ====== Proof System ======
+
+# 🔥 ဒီမှာ ပြင်ဆင်ထားတယ် (Admin ဆီ Instant Notification ထည့်ပြီး)
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
-    user_name = update.effective_user.first_name or "User"
-    username = update.effective_user.username or "No username"
+    photo = update.message.photo[-1].file_id
     
+    # အသုံးပြုသူရှိမရှိ စစ်ပြီး မရှိရင် add လုပ်ပါ
     user = get_user(user_id)
     if not user:
         add_user(user_id, "free")
-        user = get_user(user_id)
     
-    plan, usage, _, _, price = user
-    file_id = update.message.photo[-1].file_id
-    
+    # DB update (proof_file_id နဲ့ status ကို pending ပြောင်းပါ)
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
-    c.execute("UPDATE users SET proof_status=?, proof_file_id=? WHERE user_id=?",
-              ("pending", file_id, user_id))
+    c.execute("UPDATE users SET proof_file_id=?, proof_status='pending' WHERE user_id=?", (photo, user_id))
     conn.commit()
     conn.close()
     
-    # 💬 Customer ကို ပြန်ကြားစာ
-    await update.message.reply_text(
-        "📸 Screenshot proof ကို လက်ခံပြီးပါပြီ။\n"
-        "Admin စစ်ဆေးနေပါမယ်။ ကျေးဇူးပါ။ 🙏"
-    )
+    # User ကို အတည်ပြုစာ ပြန်ပို့ပါ
+    await update.message.reply_text("📸 Proof လက်ခံပြီးပါပြီ။ Admin စစ်ဆေးနေပါမယ်။")
     
-    # 🔔 Admin ကို သတိပေးစာ ပို့မယ်
+    # ✅ Admin ဆီကို ချက်ချင်းသတိပေးစာ (Instant Notification) ပို့ပါ
     try:
-        admin_msg = (
-            f"🔔 **New Proof Received!**\n\n"
-            f"👤 User: {user_name}\n"
-            f"🆔 ID: `{user_id}`\n"
-            f"📛 Username: @{username}\n"
-            f"📌 Plan: **{plan}**\n"
-            f"💰 Price: {price:,} MMK\n"
-            f"📊 Usage: {usage}/{PLAN_LIMITS[plan]['limit']}\n\n"
-            f"📸 File ID: `{file_id}`\n\n"
-            f"✅ Approve: /approve_proof {user_id}\n"
-            f"❌ Reject: /reject_proof {user_id}"
-        )
         await context.bot.send_message(
             chat_id=ADMIN_ID,
-            text=admin_msg,
-            parse_mode="Markdown"
+            text=f"📋 User {user_id} က Proof တင်လိုက်ပါပြီ။"
+        )
+        await context.bot.send_photo(
+            chat_id=ADMIN_ID,
+            photo=photo,
+            caption=f"Proof from User {user_id}\n\nအတည်ပြုရန်: /approve_proof {user_id}\nပယ်ရန်: /reject_proof {user_id}"
         )
     except Exception as e:
-        print(f"⚠️ Failed to send admin notification: {e}")
+        print(f"⚠️ Admin notification error: {e}")
 
 async def pending_proofs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
-        await update.message.reply_text("❌ Admin only command!")
+        await update.message.reply_text("❌ Admin only!")
         return
-    
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
     c.execute("SELECT user_id, proof_file_id FROM users WHERE proof_status='pending'")
     results = c.fetchall()
     conn.close()
-    
     if not results:
-        await update.message.reply_text("📭 Pending proof တွေ မရှိပါဘူး။")
+        await update.message.reply_text("📭 Pending proof မရှိပါ။")
         return
-    
-    msg = "📋 **Pending Proofs List:**\n\n"
+    msg = "📋 Pending Proofs:\n"
     for uid, fid in results:
-        msg += f"• User ID: `{uid}`\n  File ID: `{fid[:20]}...`\n\n"
-    
-    if len(msg) > 4000:
-        for i in range(0, len(msg), 4000):
-            await update.message.reply_text(msg[i:i+4000], parse_mode="Markdown")
-    else:
-        await update.message.reply_text(msg, parse_mode="Markdown")
+        msg += f"• User `{uid}` → Proof File ID: {fid[:20]}...\n"
+    await update.message.reply_text(msg, parse_mode="Markdown")
 
 async def approve_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
-        await update.message.reply_text("❌ Admin only command!")
+        await update.message.reply_text("❌ Admin only!")
         return
-    
     if not context.args:
         await update.message.reply_text("Usage: /approve_proof <user_id>")
         return
-    
     target_user = context.args[0]
-    
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
     price = PLAN_LIMITS["premium"]["price"]
-    c.execute("""
-        UPDATE users 
-        SET proof_status='approved', plan='premium', usage_count=0, price=? 
-        WHERE user_id=? AND proof_status='pending'
-    """, (price, target_user))
+    c.execute("""UPDATE users 
+                 SET proof_status='approved', plan='premium', usage_count=0, price=? 
+                 WHERE user_id=? AND proof_status='pending'""",
+              (price, target_user))
     if c.rowcount == 0:
-        await update.message.reply_text(f"❌ User `{target_user}` ကို ရှာမတွေ့ပါ သို့မဟုတ် pending မဟုတ်ပါ။")
+        await update.message.reply_text(f"❌ User `{target_user}` မတွေ့ပါ သို့မဟုတ် pending မဟုတ်ပါ။")
         conn.close()
         return
     conn.commit()
     conn.close()
-    
-    await update.message.reply_text(f"✅ User `{target_user}` ရဲ့ Proof ကို Approved လုပ်ပြီး Premium Plan ကို အဆင့်မြှင့်ပေးလိုက်ပါပြီ။")
-    
+    await update.message.reply_text(f"✅ User `{target_user}` Premium သို့ အဆင့်မြှင့်ပြီးပါပြီ။")
     try:
-        await context.bot.send_message(
-            chat_id=int(target_user),
-            text="🎉 ခင်ဗျားရဲ့ Proof ကို Admin က အတည်ပြုပြီးပါပြီ။ Premium Plan ကို အခမဲ့ရရှိပါပြီ။"
-        )
+        await context.bot.send_message(chat_id=int(target_user),
+                                       text="🎉 သင့် Proof အတည်ပြုပြီး Premium Plan ရရှိပါပြီ။")
     except Exception:
         pass
 
 async def reject_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
-        await update.message.reply_text("❌ Admin only command!")
+        await update.message.reply_text("❌ Admin only!")
         return
-    
     if not context.args:
         await update.message.reply_text("Usage: /reject_proof <user_id>")
         return
-    
     target_user = context.args[0]
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
     c.execute("UPDATE users SET proof_status='rejected' WHERE user_id=? AND proof_status='pending'", (target_user,))
     if c.rowcount == 0:
-        await update.message.reply_text(f"❌ User `{target_user}` ကို ရှာမတွေ့ပါ သို့မဟုတ် pending မဟုတ်ပါ။")
+        await update.message.reply_text(f"❌ User `{target_user}` မတွေ့ပါ သို့မဟုတ် pending မဟုတ်ပါ။")
         conn.close()
         return
     conn.commit()
     conn.close()
-    
-    await update.message.reply_text(f"❌ User `{target_user}` ရဲ့ Proof ကို Reject လုပ်ပြီးပါပြီ။")
+    await update.message.reply_text(f"❌ User `{target_user}` Proof ကို Reject လုပ်ပြီးပါပြီ။")
     try:
-        await context.bot.send_message(
-            chat_id=int(target_user),
-            text="⚠️ သင့် Screenshot proof ကို Admin က အတည်မပြုပါ။ ကျေးဇူးပြုပြီး ပြန်လည်တင်ပေးပါ။"
-        )
+        await context.bot.send_message(chat_id=int(target_user),
+                                       text="⚠️ သင့် Proof ကို ငြင်းပယ်ခံရပါသည်။ ပြန်လည်တင်ပေးပါ။")
     except Exception:
         pass
 
-# ====== handle_message with Auto Subscribe ======
+# ====== Auto Subscribe via text message ======
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     original_text = update.message.text
     user_text_lower = original_text.lower()
     
-    # Auto Subscribe: သုံးပြီးသူက "free", "basic", "premium" လို့ရိုက်လိုက်ရင်
     if user_text_lower in ["free", "basic", "premium"]:
         context.args = [user_text_lower]
         await subscribe(update, context)
         return
     
-    # အခြား AI မေးမြန်းမှုတွေ
     user_id = str(update.effective_user.id)
     if not check_limit(user_id):
         await update.message.reply_text("❌ သုံးခွင့်ကုန်သွားပါပြီ။ Plan အသစ်ရွေးပါ။")
@@ -529,7 +492,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     increment_usage(user_id)
-    
     bot_name = get_bot_name(original_text)
     if bot_name:
         answer = f"{bot_name} ပြောတယ်... {answer}"
@@ -550,7 +512,7 @@ def run_bot():
     app.add_handler(CommandHandler("pending_proofs", pending_proofs))
     app.add_handler(CommandHandler("approve_proof", approve_proof))
     app.add_handler(CommandHandler("reject_proof", reject_proof))
-    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))  # ဒီမှာ ခေါ်သုံးတယ်
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
     print("✅ Bot ready!")
