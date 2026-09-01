@@ -11,12 +11,12 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # ====== Configuration ======
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or "8617869426:AAHzomx_Uikd_S69UxCGAp4avOWUx6ytqVM"
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY") or "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"
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD") or "mysecret123"
-
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-ADMIN_ID = 123456789  # မင်း Telegram ID ထည့်ပါ
 
-# ---- Plan Limits ----
+ADMIN_ID = 123456789  # မင်း Telegram ID ထည့်ပါ
+ADMIN_PASSWORD = "mysecret123"  # Flask Dashboard Password
+
+# Plan Limits (Limit + Price in MMK)
 PLAN_LIMITS = {
     "free": {"limit": 50, "price": 0},
     "basic": {"limit": 500, "price": 10000},
@@ -28,14 +28,13 @@ BOT_NAMES = ["မစ္စတာသန်း"]
 # ====== Flask App ======
 flask_app = Flask(__name__)
 
-# ====== Auth Functions ======
+# ====== Flask Auth ======
 def check_auth(password):
     return password == ADMIN_PASSWORD
 
 def authenticate():
     return Response(
-        "❌ Unauthorized! Password required.",
-        401,
+        "❌ Unauthorized! Password required.", 401,
         {"WWW-Authenticate": 'Basic realm="Login Required"'}
     )
 
@@ -50,7 +49,7 @@ def requires_auth(f):
 # ====== Flask Routes ======
 @flask_app.route('/')
 def home():
-    return "🤖 Bot is running!"
+    return "🤖 Bot is running! Visit /admin/proofs for dashboard."
 
 @flask_app.route('/health')
 def health():
@@ -65,22 +64,17 @@ def admin_proofs():
     results = c.fetchall()
     conn.close()
     
-    html = """
-    <html>
-    <head><title>📋 Proofs Dashboard</title></head>
-    <body>
-    <h2>📋 Proofs Dashboard</h2>
-    <table border='1' cellpadding='5' style='border-collapse:collapse;'>
-    <tr><th>User ID</th><th>Plan</th><th>Usage</th><th>Proof Status</th><th>File ID</th><th>Actions</th></tr>
-    """
+    html = "<h2>📋 Proofs Dashboard</h2>"
+    html += "<table border='1' cellpadding='5' style='border-collapse:collapse;'>"
+    html += "<tr><th>User ID</th><th>Plan</th><th>Usage</th><th>Proof Status</th><th>File ID</th><th>Actions</th></tr>"
     for uid, plan, usage, status, file_id in results:
-        html += f"<tr><td>{uid}</td><td>{plan}</td><td>{usage}</td><td>{status}</td><td>{file_id[:20] if file_id else '-'}...</td>"
+        html += f"<tr><td>{uid}</td><td>{plan}</td><td>{usage}</td><td>{status}</td><td>{file_id[:30] if file_id else '-'}...</td>"
         if status == "pending":
             html += f"<td><a href='/admin/approve/{uid}'>✅ Approve</a> | <a href='/admin/reject/{uid}'>❌ Reject</a></td>"
         else:
             html += "<td>-</td>"
         html += "</tr>"
-    html += "</table></body></html>"
+    html += "</table>"
     return html
 
 @flask_app.route('/admin/approve/<user_id>')
@@ -89,13 +83,14 @@ def approve_user(user_id):
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
     price = PLAN_LIMITS["premium"]["price"]
-    c.execute("""UPDATE users 
-                 SET proof_status='approved', plan='premium', usage_count=0, price=? 
-                 WHERE user_id=? AND proof_status='pending'""",
-              (price, user_id))
+    c.execute("""
+        UPDATE users 
+        SET proof_status='approved', plan='premium', usage_count=0, price=? 
+        WHERE user_id=? AND proof_status='pending'
+    """, (price, user_id))
     conn.commit()
     conn.close()
-    return f"✅ User {user_id} upgraded to Premium!"
+    return f"✅ User {user_id} upgraded to Premium Plan!"
 
 @flask_app.route('/admin/reject/<user_id>')
 @requires_auth
@@ -128,18 +123,25 @@ def init_db():
     c = conn.cursor()
     c.execute("""CREATE TABLE IF NOT EXISTS users (
         user_id TEXT PRIMARY KEY,
-        plan TEXT,
-        usage_count INTEGER,
+        plan TEXT DEFAULT 'free',
+        usage_count INTEGER DEFAULT 0,
         proof_status TEXT DEFAULT 'none',
         proof_file_id TEXT,
         price INTEGER DEFAULT 0
     )""")
-    # Migration for existing columns
-    for col in ["proof_status", "proof_file_id", "price"]:
-        try:
-            c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT DEFAULT 'none'")
-        except sqlite3.OperationalError:
-            pass
+    # Migration for missing columns
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN proof_status TEXT DEFAULT 'none'")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN proof_file_id TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN price INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
     conn.commit()
     conn.close()
 
@@ -147,10 +149,10 @@ def add_user(user_id, plan="free"):
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
     price = PLAN_LIMITS[plan]["price"]
-    c.execute("""INSERT OR REPLACE INTO users 
-                 (user_id, plan, usage_count, proof_status, proof_file_id, price) 
-                 VALUES (?, ?, ?, ?, ?, ?)""",
-              (user_id, plan, 0, "none", None, price))
+    c.execute("""
+        INSERT OR REPLACE INTO users (user_id, plan, usage_count, proof_status, proof_file_id, price) 
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (user_id, plan, 0, "none", None, price))
     conn.commit()
     conn.close()
 
@@ -213,33 +215,37 @@ async def ask_model(prompt):
         result = response.json()
         return result["choices"][0]["message"]["content"].strip()
 
-# ====== Telegram Bot Handlers ======
+# ====== Telegram Bot Command Handlers ======
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     user = get_user(user_id)
     if not user:
         add_user(user_id, "free")
+    user_name = update.effective_user.first_name
     await update.message.reply_text(
-        f"🙏 မင်္ဂလာပါ {update.effective_user.first_name}။\n"
+        f"🙏 မင်္ဂလာပါ {user_name}။ ကျွန်တော် မစ္စတာသန်း (Mr.T) ပါ။\n\n"
         "Commands:\n"
         "/subscribe <plan> - Plan ပြောင်းရန် (free/basic/premium)\n"
         "/ask <question> - AI ကို မေးမြန်းရန်\n"
         "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
+        "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n"
         "/help - အကူအညီ"
     )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📌 Commands:\n"
-        "/start - စတင်ရန်\n"
+        "📌 **အသုံးပြုနည်း**\n\n"
+        "/start - ဘော့စတင်\n"
         "/help - အကူအညီ\n"
         "/subscribe <plan> - Plan ပြောင်းရန် (free/basic/premium)\n"
-        "/ask <question> - AI မေးမြန်းရန်\n"
-        "/status - ကိုယ့် Status ကြည့်ရန်\n"
-        "/verify <user_id> <plan> - (Admin Only)\n"
-        "/pending_proofs - (Admin Only)\n"
-        "/approve_proof <user_id> - (Admin Only)\n"
-        "/reject_proof <user_id> - (Admin Only)"
+        "/ask <question> - AI ကို မေးမြန်းရန်\n"
+        "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
+        "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n\n"
+        "**Admin Commands:**\n"
+        "/verify <user_id> <plan> - Plan ပြောင်းရန်\n"
+        "/pending_proofs - Pending Proofs စာရင်းကြည့်ရန်\n"
+        "/approve_proof <user_id> - Proof အတည်ပြုရန်\n"
+        "/reject_proof <user_id> - Proof ပယ်ရန်"
     )
 
 async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -248,7 +254,7 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if plan not in PLAN_LIMITS:
         allowed = ", ".join(PLAN_LIMITS.keys())
-        await update.message.reply_text(f"❌ '{plan}' မရှိပါ။ ရနိုင်တဲ့ Plan: {allowed}")
+        await update.message.reply_text(f"❌ '{plan}' ဆိုတာ မရှိပါ။ ရနိုင်တဲ့ Plan: {allowed}")
         return
     
     add_user(user_id, plan)
@@ -257,7 +263,7 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(
         f"✅ **{plan}** Plan ကို အောင်မြင်စွာ Subscribe လုပ်ပြီးပါပြီ။\n"
-        f"💰 စျေးနှုန်း: {price} MMK / month\n"
+        f"💰 စျေးနှုန်း: {price:,} MMK / month\n"
         f"📊 သုံးခွင့်: {limit} ကြိမ်"
     )
 
@@ -274,21 +280,24 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"📊 **Your Status**\n"
         f"📌 Plan: **{plan}**\n"
-        f"💰 စျေးနှုန်း: {price} MMK / month\n"
+        f"💰 စျေးနှုန်း: {price:,} MMK / month\n"
         f"📊 သုံးပြီးသား: {usage} / {limit} ကြိမ်\n"
         f"✅ ကျန်သုံးခွင့်: **{remaining}** ကြိမ်\n"
-        f"📸 Proof Status: **{proof_status}**"
+        f"🔍 Proof Status: **{proof_status}**"
     )
 
 async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     
     if not check_limit(user_id):
-        await update.message.reply_text("❌ သုံးခွင့်ကုန်သွားပါပြီ။ /subscribe နဲ့ Plan အသစ်ရွေးပါ။")
+        await update.message.reply_text(
+            "❌ သင့် Plan အတွက် သုံးခွင့်ကုန်သွားပါပြီ။\n"
+            "Plan အသစ်သို့ အဆင့်မြှင့်ရန် /subscribe ကိုသုံးပါ။"
+        )
         return
     
     if not context.args:
-        await update.message.reply_text("❌ မေးခွန်းထည့်ပါ။ Usage: /ask <question>")
+        await update.message.reply_text("❌ မေးခွန်းထည့်ပေးပါ။\nUsage: /ask <your question>")
         return
     
     question = " ".join(context.args)
@@ -302,99 +311,144 @@ async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     increment_usage(user_id)
-    await update.message.reply_text(answer, disable_web_page_preview=True)
+    
+    if len(answer) > 4000:
+        for i in range(0, len(answer), 4000):
+            await update.message.reply_text(answer[i:i+4000], disable_web_page_preview=True)
+    else:
+        await update.message.reply_text(answer, disable_web_page_preview=True)
 
 async def verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
-        await update.message.reply_text("❌ Admin only!")
+        await update.message.reply_text("❌ Admin only command!")
         return
+    
     if len(context.args) < 2:
         await update.message.reply_text("Usage: /verify <user_id> <plan>")
         return
+    
     target_user = context.args[0]
     plan = context.args[1]
+    
     if plan not in PLAN_LIMITS:
-        await update.message.reply_text("❌ Invalid plan")
+        allowed = ", ".join(PLAN_LIMITS.keys())
+        await update.message.reply_text(f"❌ Invalid plan. Allowed: {allowed}")
         return
+    
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
-    c.execute("UPDATE users SET plan=?, usage_count=0 WHERE user_id=?", (plan, target_user))
+    price = PLAN_LIMITS[plan]["price"]
+    c.execute("UPDATE users SET plan=?, usage_count=0, price=? WHERE user_id=?", (plan, price, target_user))
     conn.commit()
     conn.close()
-    await update.message.reply_text(f"✅ User {target_user} upgraded to {plan}!")
+    
+    await update.message.reply_text(f"✅ User {target_user} upgraded to {plan} plan!")
 
+# ====== Proof System ======
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
+    
+    user = get_user(user_id)
+    if not user:
+        add_user(user_id, "free")
+    
     file_id = update.message.photo[-1].file_id
+    
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
     c.execute("UPDATE users SET proof_status=?, proof_file_id=? WHERE user_id=?",
               ("pending", file_id, user_id))
     conn.commit()
     conn.close()
-    await update.message.reply_text("📸 Proof လက်ခံပြီးပါပြီ။ Admin စစ်ဆေးနေပါမယ်။")
+    
+    await update.message.reply_text("📸 Screenshot proof ကို လက်ခံပြီးပါပြီ။ Admin စစ်ဆေးနေပါမယ်။")
 
 async def pending_proofs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
-        await update.message.reply_text("❌ Admin only!")
+        await update.message.reply_text("❌ Admin only command!")
         return
+    
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
     c.execute("SELECT user_id, proof_file_id FROM users WHERE proof_status='pending'")
     results = c.fetchall()
     conn.close()
+    
     if not results:
-        await update.message.reply_text("📭 Pending proof မရှိပါ။")
+        await update.message.reply_text("📭 Pending proof တွေ မရှိပါဘူး။")
         return
-    msg = "📋 Pending Proofs:\n"
+    
+    msg = "📋 **Pending Proofs List:**\n\n"
     for uid, fid in results:
-        msg += f"• `{uid}` → {fid[:20]}...\n"
-    await update.message.reply_text(msg, parse_mode="Markdown")
+        msg += f"• User ID: `{uid}`\n  File ID: `{fid[:20]}...`\n\n"
+    
+    if len(msg) > 4000:
+        for i in range(0, len(msg), 4000):
+            await update.message.reply_text(msg[i:i+4000], parse_mode="Markdown")
+    else:
+        await update.message.reply_text(msg, parse_mode="Markdown")
 
 async def approve_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
-        await update.message.reply_text("❌ Admin only!")
+        await update.message.reply_text("❌ Admin only command!")
         return
+    
     if not context.args:
         await update.message.reply_text("Usage: /approve_proof <user_id>")
         return
+    
     target_user = context.args[0]
+    
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
     price = PLAN_LIMITS["premium"]["price"]
-    c.execute("""UPDATE users 
-                 SET proof_status='approved', plan='premium', usage_count=0, price=? 
-                 WHERE user_id=? AND proof_status='pending'""",
-              (price, target_user))
+    c.execute("""
+        UPDATE users 
+        SET proof_status='approved', plan='premium', usage_count=0, price=? 
+        WHERE user_id=? AND proof_status='pending'
+    """, (price, target_user))
+    if c.rowcount == 0:
+        await update.message.reply_text(f"❌ User `{target_user}` ကို ရှာမတွေ့ပါ သို့မဟုတ် pending မဟုတ်ပါ။")
+        conn.close()
+        return
     conn.commit()
     conn.close()
-    await update.message.reply_text(f"✅ User `{target_user}` Premium သို့ အဆင့်မြှင့်ပြီးပါပြီ။")
+    
+    await update.message.reply_text(f"✅ User `{target_user}` ရဲ့ Proof ကို Approved လုပ်ပြီး Premium Plan ကို အဆင့်မြှင့်ပေးလိုက်ပါပြီ။")
+    
     try:
         await context.bot.send_message(
             chat_id=int(target_user),
-            text="🎉 သင့် Proof ကို အတည်ပြုပြီး Premium Plan ကို ရရှိပါပြီ။"
+            text="🎉 ခင်ဗျားရဲ့ Proof ကို Admin က အတည်ပြုပြီးပါပြီ။ Premium Plan ကို အခမဲ့ရရှိပါပြီ။"
         )
     except Exception:
         pass
 
 async def reject_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
-        await update.message.reply_text("❌ Admin only!")
+        await update.message.reply_text("❌ Admin only command!")
         return
+    
     if not context.args:
         await update.message.reply_text("Usage: /reject_proof <user_id>")
         return
+    
     target_user = context.args[0]
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
-    c.execute("UPDATE users SET proof_status='rejected' WHERE user_id=?", (target_user,))
+    c.execute("UPDATE users SET proof_status='rejected' WHERE user_id=? AND proof_status='pending'", (target_user,))
+    if c.rowcount == 0:
+        await update.message.reply_text(f"❌ User `{target_user}` ကို ရှာမတွေ့ပါ သို့မဟုတ် pending မဟုတ်ပါ။")
+        conn.close()
+        return
     conn.commit()
     conn.close()
-    await update.message.reply_text(f"❌ User `{target_user}` Proof ကို Reject လုပ်ပြီးပါပြီ။")
+    
+    await update.message.reply_text(f"❌ User `{target_user}` ရဲ့ Proof ကို Reject လုပ်ပြီးပါပြီ။")
     try:
         await context.bot.send_message(
             chat_id=int(target_user),
-            text="⚠️ သင့် Proof ကို ငြင်းပယ်ခံရပါသည်။ ပြန်လည်တင်ပေးပါ။"
+            text="⚠️ သင့် Screenshot proof ကို Admin က အတည်မပြုပါ။ ကျေးဇူးပြုပြီး ပြန်လည်တင်ပေးပါ။"
         )
     except Exception:
         pass
@@ -405,7 +459,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_name = get_bot_name(user_message)
     
     if not check_limit(user_id):
-        await update.message.reply_text("❌ သုံးခွင့်ကုန်သွားပါပြီ။ /subscribe နဲ့ Plan အသစ်ရွေးပါ။")
+        await update.message.reply_text(
+            "❌ သင့် Plan အတွက် သုံးခွင့်ကုန်သွားပါပြီ။\n"
+            "Plan အသစ်သို့ အဆင့်မြှင့်ရန် /subscribe ကိုသုံးပါ။"
+        )
         return
     
     await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
@@ -421,7 +478,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         answer = f"{bot_name} ပြောတယ်... {answer}"
     
     increment_usage(user_id)
-    await update.message.reply_text(answer, disable_web_page_preview=True)
+    
+    if len(answer) > 4000:
+        for i in range(0, len(answer), 4000):
+            await update.message.reply_text(answer[i:i+4000], disable_web_page_preview=True)
+    else:
+        await update.message.reply_text(answer, disable_web_page_preview=True)
 
 # ====== Run Bot ======
 def run_bot():
