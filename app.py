@@ -8,6 +8,7 @@ import functools
 import logging
 import schedule
 import time
+from datetime import datetime, timedelta
 from flask import Flask, request, Response
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -28,17 +29,14 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or "8617869426:AAHzomx
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY") or "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"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-# ====== Multi-Admin Support (Feature 1) ======
-ADMIN_IDS = [1119128553]  # @Thawkhyan999 - နောက်ထပ် Admin ID တွေ ထပ်ထည့်နိုင်ပါတယ်
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "mysecret123")  # Feature 4: Env Password
+ADMIN_IDS = [1119128553]  # @Thawkhyan999
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "mysecret123")
 
 # ====== Exchange Rate ======
-EXCHANGE_RATE = 4545  # MMK per USD (10,000 MMK = 2.2 USD)
+EXCHANGE_RATE = 4545
 
-# Payment Info
 PAYMENT_INFO = "💳 **ငွေလွှဲရန်**\nKBZPay: 09426419462\nWavePay: 09426419462"
 
-# Plan Limits (Limit + Price in MMK)
 PLAN_LIMITS = {
     "free": {"limit": 50, "price": 0},
     "basic": {"limit": 500, "price": 10000},
@@ -53,7 +51,6 @@ BOT_NAMES = ["မစ္စတာသန်း"]
 # ====== Flask App ======
 flask_app = Flask(__name__)
 
-# ====== Flask Auth ======
 def check_auth(password):
     return password == ADMIN_PASSWORD
 
@@ -72,7 +69,6 @@ def requires_auth(f):
         return f(*args, **kwargs)
     return decorated
 
-# ====== Flask Routes ======
 @flask_app.route('/')
 def home():
     return "🤖 Bot is running! Visit /admin/proofs for dashboard."
@@ -108,7 +104,6 @@ def admin_proofs():
 def approve_user(user_id):
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
-    # Feature 2: Plan Respect - User ရဲ့ Plan ကို လေးစားမယ် (premium ပဲပေးတာမဟုတ်ဘူး)
     c.execute("SELECT plan FROM users WHERE user_id=? AND proof_status='pending'", (user_id,))
     result = c.fetchone()
     if not result:
@@ -164,7 +159,8 @@ def init_db():
         usage_count INTEGER DEFAULT 0,
         proof_status TEXT DEFAULT 'none',
         proof_file_id TEXT,
-        price INTEGER DEFAULT 0
+        price INTEGER DEFAULT 0,
+        proof_timestamp TEXT
     )""")
     try:
         c.execute("ALTER TABLE users ADD COLUMN proof_status TEXT DEFAULT 'none'")
@@ -178,6 +174,10 @@ def init_db():
         c.execute("ALTER TABLE users ADD COLUMN price INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
         pass
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN proof_timestamp TEXT")
+    except sqlite3.OperationalError:
+        pass
     conn.commit()
     conn.close()
     logger.info("✅ Database initialized successfully.")
@@ -187,16 +187,16 @@ def add_user(user_id, plan="free"):
     c = conn.cursor()
     price = PLAN_LIMITS[plan]["price"]
     c.execute("""
-        INSERT OR REPLACE INTO users (user_id, plan, usage_count, proof_status, proof_file_id, price) 
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (user_id, plan, 0, "none", None, price))
+        INSERT OR REPLACE INTO users (user_id, plan, usage_count, proof_status, proof_file_id, price, proof_timestamp) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (user_id, plan, 0, "none", None, price, None))
     conn.commit()
     conn.close()
 
 def get_user(user_id):
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
-    c.execute("SELECT plan, usage_count, proof_status, proof_file_id, price FROM users WHERE user_id=?", (user_id,))
+    c.execute("SELECT plan, usage_count, proof_status, proof_file_id, price, proof_timestamp FROM users WHERE user_id=?", (user_id,))
     result = c.fetchone()
     conn.close()
     return result
@@ -206,7 +206,7 @@ def check_limit(user_id):
     if not user:
         add_user(user_id, "free")
         return True
-    plan, usage, _, _, _ = user
+    plan, usage, _, _, _, _ = user
     if usage >= PLAN_LIMITS[plan]["limit"]:
         return False
     return True
@@ -218,7 +218,7 @@ def increment_usage(user_id):
     conn.commit()
     conn.close()
 
-# ====== Feature 3: Monthly Usage Reset ======
+# ====== Feature: Monthly Usage Reset ======
 def reset_usage():
     try:
         conn = sqlite3.connect("bot_users.db")
@@ -231,7 +231,6 @@ def reset_usage():
         logger.error(f"❌ Usage reset error: {e}")
 
 def run_scheduler():
-    # 30 ရက်တစ်ခါ reset လုပ်မယ်
     schedule.every(30).days.do(reset_usage)
     logger.info("⏰ Scheduler started. Will reset usage every 30 days.")
     while True:
@@ -292,7 +291,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
         "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n"
         "/help - အကူအညီ\n\n"
-        "💡 သိကောင်းစရာ: အခမဲ့ သုံးချင်ရင် `/subscribe free` ကိုရွေးပါ၊ ပိုမိုအဆင့်မြင့်စွာ လုပ်ဆောင်စေချင်ရင် `basic` သို့မဟုတ် `premium` ကိုရွေးပြီး သုံးပါ။"
+        "💡 သိကောင်းစရာ: အခမဲ့ သုံးချင်ရင် `free` နှိပ်ပါ၊ ပိုမိုအဆင့်မြင့်စွာ လုပ်ဆောင်စေချင်ရင် `basic` သို့မဟုတ် `premium` ကိုရွေးပြီး သုံးပါ။"
     )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -343,8 +342,8 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(user_id)
     if not user:
         add_user(user_id, "free")
-        user = ("free", 0, "none", None, 0)
-    plan, usage, proof_status, _, price = user
+        user = ("free", 0, "none", None, 0, None)
+    plan, usage, proof_status, _, price, proof_timestamp = user
     limit = PLAN_LIMITS[plan]["limit"]
     remaining = limit - usage
     price_usd = get_price_usd(price)
@@ -417,29 +416,57 @@ async def verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(f"✅ User {target_user} upgraded to {plan} plan!")
 
-# ====== Proof System ======
+# ====== Proof System with Fraud Detection ======
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     photo = update.message.photo[-1].file_id
+    timestamp = update.message.date  # Telegram message timestamp
     
+    # ====== 1. Duplicate Proof Check ======
+    conn = sqlite3.connect("bot_users.db")
+    c = conn.cursor()
+    c.execute("SELECT user_id FROM users WHERE proof_file_id=? AND user_id!=?", (photo, user_id))
+    duplicate = c.fetchone()
+    
+    if duplicate:
+        conn.close()
+        await update.message.reply_text(
+            "⚠️ ဒီ Screenshot ကို အခြားသူတစ်ယောက်ကလည်း သုံးထားပါတယ်။ "
+            "Fraud ဖြစ်နိုင်ပါတယ်။ Proof အသစ်တင်ပေးပါ။"
+        )
+        return
+    
+    # ====== 2. Timestamp Check (48 hours) ======
+    if timestamp < datetime.utcnow() - timedelta(hours=48):
+        conn.close()
+        await update.message.reply_text(
+            "⚠️ Proof screenshot ဟာ 48 နာရီကျော်ပြီးသား ဖြစ်နေပါတယ်။ "
+            "အသစ်တင်ပေးပါ။"
+        )
+        return
+    
+    # ====== 3. Save to Database ======
+    # User ရှိမရှိ စစ်ပြီး မရှိရင် add လုပ်ပါ
     user = get_user(user_id)
     if not user:
         add_user(user_id, "free")
     
-    conn = sqlite3.connect("bot_users.db")
-    c = conn.cursor()
-    c.execute("UPDATE users SET proof_file_id=?, proof_status='pending' WHERE user_id=?", (photo, user_id))
+    c.execute("""
+        UPDATE users 
+        SET proof_file_id=?, proof_status='pending', proof_timestamp=? 
+        WHERE user_id=?
+    """, (photo, timestamp.isoformat(), user_id))
     conn.commit()
     conn.close()
     
     await update.message.reply_text("📸 Proof လက်ခံပြီးပါပြီ။ Admin စစ်ဆေးနေပါမယ်။")
     
-    # Feature 1: Multi-Admin Support - Admin အားလုံးကို တစ်ပြိုင်နက် အကြောင်းကြားမယ်
+    # ====== 4. Notify All Admins ======
     for admin_id in ADMIN_IDS:
         try:
             await context.bot.send_message(
                 chat_id=admin_id,
-                text=f"📋 User {user_id} က Proof တင်လိုက်ပါပြီ။"
+                text=f"📋 User {user_id} က Proof တင်လိုက်ပါပြီ။\n⏰ {timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
             )
             await context.bot.send_photo(
                 chat_id=admin_id,
@@ -455,15 +482,15 @@ async def pending_proofs(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
-    c.execute("SELECT user_id, proof_file_id FROM users WHERE proof_status='pending'")
+    c.execute("SELECT user_id, proof_file_id, proof_timestamp FROM users WHERE proof_status='pending'")
     results = c.fetchall()
     conn.close()
     if not results:
         await update.message.reply_text("📭 Pending proof မရှိပါ။")
         return
     msg = "📋 Pending Proofs:\n"
-    for uid, fid in results:
-        msg += f"• User `{uid}` → Proof File ID: {fid[:20]}...\n"
+    for uid, fid, ts in results:
+        msg += f"• User `{uid}` → {ts[:16] if ts else 'N/A'}...\n"
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 async def approve_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -476,12 +503,12 @@ async def approve_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     target_user = context.args[0]
     
-    # Feature 2: Plan Respect - User ရွေးထားတဲ့ Plan ကို လေးစားမယ်
+    # Plan Respect - User ရွေးထားတဲ့ Plan ကို လေးစားမယ်
     user_data = get_user(target_user)
     if not user_data:
         await update.message.reply_text(f"❌ User `{target_user}` မတွေ့ပါ။")
         return
-    plan, _, _, _, _ = user_data
+    plan, _, _, _, _, _ = user_data
     price = PLAN_LIMITS[plan]["price"]
     
     conn = sqlite3.connect("bot_users.db")
@@ -591,15 +618,12 @@ def run_flask():
 if __name__ == "__main__":
     init_db()
     
-    # Feature 3: Monthly Reset Scheduler (Background Thread)
     scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
     scheduler_thread.start()
     logger.info("🔄 Scheduler thread started.")
     
-    # Flask Thread
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
     logger.info("🌐 Flask server thread started.")
     
-    # Run Bot (Main Thread)
     run_bot()
