@@ -681,7 +681,7 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     keyboard = [
-        [InlineKeyboardButton("📌 Free", callback_data="sub_free")],
+        [InlineKeyboardButton("📌 Free (အခမဲ့)", callback_data="sub_free")],
         [InlineKeyboardButton("⭐ Basic (10,000 MMK)", callback_data="sub_basic")],
         [InlineKeyboardButton("💎 Premium (30,000 MMK)", callback_data="sub_premium")],
         [
@@ -695,10 +695,10 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         "📌 သင် ရွေးချင်တဲ့ Plan ကို ရွေးပါ။\n\n"
-        f"📊 Free: {PLAN_LIMITS['free']['limit']} (အခမဲ့)\n"
-        f"📊 Basic: {PLAN_LIMITS['basic']['limit']} (10,000 MMK)\n"
-        f"📊 Premium: {PLAN_LIMITS['premium']['limit']} (30,000 MMK)\n"
-        f"👑 Premium+: {PLAN_LIMITS['premium_plus']['limit']} (50,000 MMK) - VIP Coaching",
+        "📌 Free - အခမဲ့\n"
+        "⭐ Basic - 10,000 MMK\n"
+        "💎 Premium - 30,000 MMK\n"
+        "👑 Premium+ - 50,000 MMK (VIP Coaching)",
         reply_markup=reply_markup,
     )
 
