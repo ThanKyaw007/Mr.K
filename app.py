@@ -309,14 +309,15 @@ def add_user(user_id, plan="free"):
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
     price = PLAN_LIMITS[plan]["price"]
-    c.execute("""INSERT OR REPLACE INTO users (user_id, plan, usage_count, proof_status, proof_file_id, price, proof_timestamp, goals, weaknesses, dream, career, money_mindset, relationship) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (user_id, plan, 0, "none", None, price, None, None, None, None, None, None, None))
+    c.execute("""INSERT OR REPLACE INTO users (user_id, plan, usage_count, proof_status, proof_file_id, price, proof_timestamp, goals, weaknesses, dream, career, money_mindset, relationship, birthdate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (user_id, plan, 0, "none", None, price, None, None, None, None, None, None, None, None))
     conn.commit()
     conn.close()
 
 def get_user(user_id):
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
-    c.execute("SELECT plan, usage_count, proof_status, proof_file_id, price, proof_timestamp, goals, weaknesses, dream, career, money_mindset, relationship FROM users WHERE user_id=?", (user_id,))
+    # 👇 ဒီထဲမှာ birthdate ထည့်ပြီးသား ဖြစ်အောင် ကူးထည့်ပါ
+    c.execute("SELECT plan, usage_count, proof_status, proof_file_id, price, proof_timestamp, goals, weaknesses, dream, career, money_mindset, relationship, birthdate FROM users WHERE user_id=?", (user_id,))
     result = c.fetchone()
     conn.close()
     return result
@@ -644,7 +645,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📌 အသုံးပြုနည်း:\n/start - စတင်ရန်\n/help - အကူအညီ\n/subscribe - Plan ရွေးရန်\n/ask <q> - မေးရန်\n/status - အနေအထား\n/profile - ကိုယ်ရေးမှတ်တမ်း\n/habit - အလေ့အထ\n/referral - ဖိတ်ရန်\n\n🎯 ကျွန်တော် အကြံပေးနိုင်တဲ့ နယ်ပယ် ၁၆ ခုရှိပါတယ်။"
+        "📌 အသုံးပြုနည်း:\n/start - စတင်ရန်\n/help - အကူအညီ\n/subscribe - Plan ရွေးရန်\n/ask <q> - မေးရန်\n/status - အနေအထား\n/profile - ကိုယ်ရေးမှတ်တမ်း\n/habit - အလေ့အထ\n/referral - ဖိတ်ရန်\n\n"🎯 ကျွန်တော် အကြံပေးနိုင်တဲ့ နယ်ပယ် ၁၉ ခုရှိပါတယ်။"
     )
 
 async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -717,14 +718,17 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(user_id)
     if not user:
         add_user(user_id, "free")
-        user = ("free", 0, "none", None, 0, None, None, None, None, None, None, None)
-    (plan, usage, proof_status, _, price, _, goals, weaknesses, dream, career, money_mindset, relationship, birthdate FROM users WHERE user_id=?") = user
+        user = ("free", 0, "none", None, 0, None, None, None, None, None, None, None, None) # ၁၃ ခု ထည့်ပါ
+    # 👇 ဒီလိုင်းကို ဒီအတိုင်း ပြင်ပါ (birthdate ပါအောင်)
+    (plan, usage, proof_status, _, price, _, goals, weaknesses, dream, career, money_mindset, relationship, birthdate) = user
     limit = PLAN_LIMITS[plan]["limit"]
     remaining = limit - usage
     price_usd = get_price_usd(price)
     ref_count = get_referral_count(user_id)
     level = usage // 100 + 1
     level_title = "🥉 Bronze" if level == 1 else "🥈 Silver" if level == 2 else "🥇 Gold" if level >= 3 else "🌱 Beginner"
+    
+    # (အောက်က မူရင်း code တွေ ဆက်သွားပါ)
     profile_preview = ""
     if goals: profile_preview += f"\n• 🎯 Goals: {goals}"
     if career: profile_preview += f"\n• 💼 Career: {career}"
@@ -732,8 +736,8 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if dream: profile_preview += f"\n• 🌟 Dream: {dream}"
     if weaknesses: profile_preview += f"\n• ⚠️ Weaknesses: {weaknesses}"
     if relationship: profile_preview += f"\n• ❤️ Relationship: {relationship}"
+    if birthdate: profile_preview += f"\n• 🎂 Birthdate: {birthdate}" # ဗေဒင်အတွက် ထည့်ပါ
     await update.message.reply_text(f"📊 **Your Status**\n🏅 Level: {level_title} (Lv.{level})\n📌 Plan: **{plan}**\n📈 Usage: {usage}/{limit}\n🔋 Remaining: **{remaining}**\n🔍 Proof Status: {proof_status}\n👥 Referrals: **{ref_count}**{profile_preview}")
-
 async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     chat_type = update.effective_chat.type
@@ -786,7 +790,7 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     field_map = {"goals": "goals", "weaknesses": "weaknesses", "dream": "dream", "career": "career", "money_mindset": "money_mindset", "relationship": "relationship", "birthdate": "birthdate",}
     key = field_map.get(field_raw)
     if not key:
-        await update.message.reply_text("❌ field မမှန်ပါ။ goals/weaknesses/dream/career/money_mindset/relationship ထဲက တစ်ခုသုံးပါ။")
+        await update.message.reply_text("❌ field မမှန်ပါ။ goals/weaknesses/dream/career/money_mindset/relationship/birthdate ထဲက တစ်ခုသုံးပါ။")
         return
     update_profile(user_id, key, value)
     await update.message.reply_text(f"✅ `{key}` ကို update လုပ်ပြီးပါပြီ။")
