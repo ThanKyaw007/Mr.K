@@ -218,11 +218,7 @@ def clean_text(text):
     text = re.sub(r"https?://\S+", "", text)
     text = re.sub(r"t\.me/\S+", "", text)
     text = re.sub(r"www\.\S+", "", text)
-    text = re.sub(r"
-
-\[.*?\]
-
-\(.*?\)", "", text)
+    text = re.sub(r"\[.*?\]\(.*?\)", "", text)
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 
