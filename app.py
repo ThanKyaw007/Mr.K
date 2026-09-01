@@ -568,18 +568,33 @@ def run_scheduler(bot):
 # ====== Telegram Bot Command Handlers ======
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
+
     if context.args:
         ref_code = context.args[0]
         if ref_code.startswith("REF"):
             inviter_id = ref_code.replace("REF", "")
             if inviter_id != user_id:
                 give_referral_reward(inviter_id, user_id)
+
     user = get_user(user_id)
     if not user:
         add_user(user_id, "free")
+
     await update.message.reply_text(
         "🙏 မင်္ဂလာပါ။ ကျွန်တော် မစ္စတာသန်းပါ။\n"
-        "Commands:\n/subscribe <plan> - Plan ပြောင်းရန်\n/ask <question> - AI ကို မေးမြန်းရန်\n/status - Plan နှင့် သုံးခွင့်\n/profile - Profile သိမ်းရန်\n/habit - Habit ထည့်ရန်\n/help - အကူအညီ"
+        "သင့်ရဲ့ လက်ထောက် အဖြစ်နဲ့ ကိုယ်ရေးကိုယ်တာ၊ အလုပ်အကိုင်နဲ့ "
+        "တခြားလုပ်ဆောင်ရမယ့် အရာတွေကို ယုံကြည်စွာ ဖြေရှင်းပေးဖို့ အသင့်ပါဗျ။\n\n"
+        "Commands:\n"
+        "/subscribe <plan> - Plan ပြောင်းရန် (free/basic/premium/premium_plus)\n"
+        "/ask <question> - AI ကို မေးမြန်းရန်\n"
+        "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
+        "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n"
+        "/referral - သင့် referral link ရယူရန်\n"
+        "/profile <field> : <value> - Profile သိမ်းရန်\n"
+        "/habit <habit> - Habit ထည့်ရန်\n"
+        "/myhabits - သင့် habits စာရင်းကြည့်ရန်\n"
+        "/help - အကူအညီ\n\n"
+        "💡 သိကောင်းစရာ: အခမဲ့ သုံးချင်ရင် `/subscribe free` နှိပ်ပါ။"
     )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
