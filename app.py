@@ -14,7 +14,6 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or "8617869426:AAHzomx
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY") or "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"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-# ✅ ခင်ဗျားရဲ့ Telegram ID ကို ထည့်ထားပါပြီ
 ADMIN_ID = 1119128553  # @Thawkhyan999
 ADMIN_PASSWORD = "mysecret123"  # Flask Dashboard Password
 
@@ -238,11 +237,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user:
         add_user(user_id, "free")
     await update.message.reply_text(
-        "🙏 မင်္ဂလာပါ။ ကျွန်တော် မစ္စတာသန်းပါ။\n\n"
+        "🙏 မင်္ဂလာပါ။ ကျွန်တော် မစ္စတာသန်းပါ။\n"
+        "သင့်ရဲ့ လက်ထောက် အဖြစ်နဲ့ ကိုယ်ရေးကိုယ်တာ၊ အလုပ်အကိုင် စတာတွေကို ယုံကြည်စွာ တိုင်ပင် ဖြေရှင်းပေးဖို့ အသင့်ပါ။\n\n"
         "Commands:\n"
         "/subscribe <plan> - Plan ပြောင်းရန် (free/basic/premium)\n"
         "/ask <question> - AI ကို မေးမြန်းရန်\n"
         "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
+        "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n"
         "/help - အကူအညီ\n\n"
         "💡 သိကောင်းစရာ: `free`, `basic`, `premium` လို့ရိုက်ရင် အလိုအလျောက် subscribe လုပ်ပေးမယ်။"
     )
@@ -381,7 +382,6 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text("📸 Proof လက်ခံပြီးပါပြီ။ Admin စစ်ဆေးနေပါမယ်။")
     
-    # ✅ Admin ဆီကို ချက်ချင်းသတိပေးစာ (Instant Notification) ပို့ပါ
     try:
         await context.bot.send_message(
             chat_id=ADMIN_ID,
