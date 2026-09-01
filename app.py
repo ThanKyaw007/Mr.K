@@ -17,6 +17,10 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 ADMIN_ID = 123456789  # မင်း Telegram ID ထည့်ပါ
 ADMIN_PASSWORD = "mysecret123"  # Flask Dashboard Password
 
+# Payment Info
+PAYMENT_PHONE = "09426419462"
+PAYMENT_METHODS = "KBZ Pay / Wave Pay"
+
 # Plan Limits (Limit + Price in MMK)
 PLAN_LIMITS = {
     "free": {"limit": 50, "price": 0},
@@ -221,8 +225,6 @@ async def ask_model(prompt):
             }
         )
         result = response.json()
-        
-        # ✅ Safe check
         if "choices" in result and len(result["choices"]) > 0:
             return result["choices"][0]["message"]["content"].strip()
         elif "error" in result:
@@ -242,7 +244,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/subscribe <plan> - Plan ပြောင်းရန် (free/basic/premium)\n"
         "/ask <question> - AI ကို မေးမြန်းရန်\n"
         "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
-        "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n"
+        "/proof - ငွေလွှဲ Screenshot proof တင်ရန်\n"
         "/help - အကူအညီ"
     )
 
@@ -251,10 +253,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📌 **အသုံးပြုနည်း**\n\n"
         "/start - ဘော့စတင်\n"
         "/help - အကူအညီ\n"
-        "/subscribe <plan> - Plan ပြောင်းရန် (free/basic/premium)\n"
+        "/subscribe <plan> - Plan ရွေးချယ်ရန် (free/basic/premium)\n"
         "/ask <question> - AI ကို မေးမြန်းရန်\n"
         "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
-        "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n\n"
+        "/proof - ငွေလွှဲ Screenshot proof တင်ရန်\n\n"
         "**Admin Commands:**\n"
         "/verify <user_id> <plan> - Plan ပြောင်းရန်\n"
         "/pending_proofs - Pending Proofs စာရင်းကြည့်ရန်\n"
@@ -268,17 +270,35 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if plan not in PLAN_LIMITS:
         allowed = ", ".join(PLAN_LIMITS.keys())
-        await update.message.reply_text(f"❌ '{plan}' ဆိုတာ မရှိပါ။ ရနိုင်တဲ့ Plan: {allowed}")
+        await update.message.reply_text(f"❌ '{plan}' မရှိပါ။ ရနိုင်တဲ့ Plan: {allowed}")
         return
     
-    add_user(user_id, plan)
-    price = PLAN_LIMITS[plan]["price"]
-    limit = PLAN_LIMITS[plan]["limit"]
+    # Plan ကို တန်းပြီး upgrade မလုပ်ဘဲ proof တောင်းအောင် ပြင်ထားတယ်
+    conn = sqlite3.connect("bot_users.db")
+    c = conn.cursor()
+    c.execute("UPDATE users SET plan=?, proof_status='waiting', price=? WHERE user_id=?",
+              (plan, PLAN_LIMITS[plan]["price"], user_id))
+    conn.commit()
+    conn.close()
     
     await update.message.reply_text(
-        f"✅ **{plan}** Plan ကို အောင်မြင်စွာ Subscribe လုပ်ပြီးပါပြီ။\n"
-        f"💰 စျေးနှုန်း: {price:,} MMK / month\n"
-        f"📊 သုံးခွင့်: {limit} ကြိမ်"
+        f"📌 **{plan}** Plan ကို ရွေးလိုက်ပါပြီ။\n"
+        f"💰 စျေးနှုန်း: {PLAN_LIMITS[plan]['price']:,} MMK / month\n\n"
+        "📸 ကျေးဇူးပြုပြီး ငွေသွင်း proof screenshot ကို ပို့ပါ။\n"
+        "💳 **ငွေလွှဲရန်:**\n"
+        f"• {PAYMENT_METHODS}\n"
+        f"• ဖုန်းနံပါတ်: `{PAYMENT_PHONE}`\n\n"
+        "Screenshot ကို ဒီ Chat ထဲကို တိုက်ရိုက်ပို့ပါ။"
+    )
+
+async def proof_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """User ကို Proof ပို့ဖို့ ညွှန်ကြားတဲ့ Command"""
+    await update.message.reply_text(
+        "📸 ကျေးဇူးပြုပြီး ငွေလွှဲ Screenshot proof ကို ပို့ပါ။\n\n"
+        "💳 **ငွေလွှဲရန်:**\n"
+        f"• {PAYMENT_METHODS}\n"
+        f"• ဖုန်းနံပါတ်: `{PAYMENT_PHONE}`\n\n"
+        "Screenshot ကို ဒီ Chat ထဲကို တိုက်ရိုက်ပို့ပါ။"
     )
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -291,13 +311,22 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     limit = PLAN_LIMITS[plan]["limit"]
     remaining = limit - usage
     
+    status_map = {
+        "none": "မရှိသေး",
+        "waiting": "စောင့်ဆိုင်းနေ (Proof ပို့ရန်)",
+        "pending": "စစ်ဆေးနေပါပြီ",
+        "approved": "အတည်ပြုပြီး",
+        "rejected": "ပယ်ချထား"
+    }
+    status_text = status_map.get(proof_status, proof_status)
+    
     await update.message.reply_text(
         f"📊 **Your Status**\n"
         f"📌 Plan: **{plan}**\n"
         f"💰 စျေးနှုန်း: {price:,} MMK / month\n"
         f"📊 သုံးပြီးသား: {usage} / {limit} ကြိမ်\n"
         f"✅ ကျန်သုံးခွင့်: **{remaining}** ကြိမ်\n"
-        f"🔍 Proof Status: **{proof_status}**"
+        f"🔍 Proof Status: **{status_text}**"
     )
 
 async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -365,6 +394,18 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(user_id)
     if not user:
         add_user(user_id, "free")
+        await update.message.reply_text("❌ ပထမဆုံး /subscribe နဲ့ Plan ကိုရွေးပါ။")
+        return
+    
+    plan, usage, proof_status, _, _ = user
+    
+    # proof_status က waiting မဟုတ်ရင် သတိပေးပါ
+    if proof_status != "waiting":
+        await update.message.reply_text(
+            "📸 ခင်ဗျား Plan ကို ရွေးထားပြီးသားပါ။\n"
+            "Plan အသစ်အတွက် /subscribe နဲ့ ရွေးပါ။"
+        )
+        return
     
     file_id = update.message.photo[-1].file_id
     
@@ -375,7 +416,10 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.commit()
     conn.close()
     
-    await update.message.reply_text("📸 Screenshot proof ကို လက်ခံပြီးပါပြီ။ Admin စစ်ဆေးနေပါမယ်။")
+    await update.message.reply_text(
+        "📸 Screenshot proof ကို လက်ခံပြီးပါပြီ။\n"
+        "Admin စစ်ဆေးနေပါမယ်။ အတည်ပြုပြီးရင် သတိပေးစာ ပို့ပေးပါမယ်။"
+    )
 
 async def pending_proofs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -384,7 +428,7 @@ async def pending_proofs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
-    c.execute("SELECT user_id, proof_file_id FROM users WHERE proof_status='pending'")
+    c.execute("SELECT user_id, plan, proof_file_id FROM users WHERE proof_status='pending'")
     results = c.fetchall()
     conn.close()
     
@@ -393,8 +437,8 @@ async def pending_proofs(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     msg = "📋 **Pending Proofs List:**\n\n"
-    for uid, fid in results:
-        msg += f"• User ID: `{uid}`\n  File ID: `{fid[:20]}...`\n\n"
+    for uid, plan, fid in results:
+        msg += f"• User ID: `{uid}`\n  Plan: {plan}\n  File ID: `{fid[:20] if fid else '-'}...`\n\n"
     
     if len(msg) > 4000:
         for i in range(0, len(msg), 4000):
@@ -507,6 +551,7 @@ def run_bot():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("subscribe", subscribe))
+    app.add_handler(CommandHandler("proof", proof_command))  # New proof command
     app.add_handler(CommandHandler("status", status))
     app.add_handler(CommandHandler("ask", ask))
     app.add_handler(CommandHandler("verify", verify))
