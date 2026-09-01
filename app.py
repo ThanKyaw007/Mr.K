@@ -242,6 +242,36 @@ def clean_text(text):
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 
+import schedule
+import time
+from datetime import datetime
+
+def backup_and_send(bot):
+    """Database ကို Backup လုပ်ပြီး Admin ဆီပို့မယ်"""
+    try:
+        # ၁။ Database ကို Backup လုပ်ပါ
+        conn = sqlite3.connect("bot_users.db")
+        c = conn.cursor()
+        c.execute(".backup bot_users_backup.db")  # SQLite backup
+        conn.close()
+        
+        # ၂။ Backup ဖိုင်ကို Admin ဆီပို့ပါ
+        with open("bot_users_backup.db", "rb") as f:
+            bot.send_document(
+                chat_id=ADMIN_ID,
+                document=f,
+                caption=f"📦 Database Backup - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+            )
+        
+        # ၃။ သိမ်းထားတဲ့ Backup ဖိုင်ကို ဖျက်ပါ (နေရာလွတ်အောင်)
+        os.remove("bot_users_backup.db")
+        
+        logger.info("✅ Database backup sent to admin")
+    except Exception as e:
+        logger.error(f"❌ Backup error: {e}")
+
+# Scheduler မှာ ထည့်ပါ (ဥပမာ - မနက် ၃ နာရီမှာ တစ်ခါ)
+schedule.every().day.at("03:00").do(lambda: asyncio.run(backup_and_send(application.bot)))
 
 # ====== Database Functions ======
 def init_db():
