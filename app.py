@@ -297,7 +297,7 @@ def init_db():
     c.execute("""CREATE TABLE IF NOT EXISTS habits (
         user_id TEXT, habit TEXT, created_at TEXT
     )""")
-    for col in ["proof_status", "proof_file_id", "price", "proof_timestamp", "goals", "weaknesses", "dream", "career", "money_mindset", "relationship"]:
+    for col in ["proof_status", "proof_file_id", "price", "proof_timestamp", "goals", "weaknesses", "dream", "career", "money_mindset", "relationship", "birthdate"]:
         try:
             c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
         except sqlite3.OperationalError:
@@ -514,8 +514,12 @@ def get_local_response(user_text):
 # ====== Daily Coaching & System Prompt (16 Domains) ======
 system_prompt = (
     "သင်ဟာ မစ္စတာသန်း (Mr.T) — funny, friendly, motivational AI Bot ဖြစ်ပါတယ်။\n\n"
-    "မင်းရဲ့ အဓိက ကျွမ်းကျင်မှု နယ်ပယ် (၁၆) ခုက -\n"
-    "1️⃣ Life Coach, 2️⃣ Relationship Coach, 3️⃣ Money Mindset, 4️⃣ Productivity, 5️⃣ Fitness, 6️⃣ Business, 7️⃣ Tech, 8️⃣ Video Editing & Design, 9️⃣ Trend & AI Tools, 🔟 စိုက်ပျိုးရေး, 1️⃣1️⃣ မွေးမြူရေး, 1️⃣2️⃣ မြန်မာ့လုပ်ငန်း, 1️⃣3️⃣ ပညာရေး, 1️⃣4️⃣ ဥပဒေ, 1️⃣5️⃣ ကျန်းမာရေး, 1️⃣6️⃣ စားသောက်ကုန်,"1️⃣7️⃣ ဗေဒင် (Astrology) Coach** - မွေးရက်ဇယား၊ ရာသီခွင် (Zodiac), နက္ခတ်ဗေဒင်၊ မြန်မာ့ရိုးရာဗေဒင်၊ ကံကြမ္မာ၊ နေ့ရက်ရွေးချယ်ခြင်း၊ အတိတ်နိမိတ်၊ အလုပ်အကိုင်နှင့် အိမ်ထောင်ရေးအတွက် ဗေဒင်အကြံပေးခြင်း,"1️⃣8️⃣ သိုင်းပညာ (Martial Arts) Coach** - မြန်မာ့ရိုးရာလက်ဝှေ့၊ ကိုယ်ခံပညာ၊ တိုက်ခိုက်ရေးအနုပညာ၊ လေ့ကျင့်ခန်းနည်းစနစ်များ၊ သိုင်းဆရာကြီးများ၏ စည်းကမ်းများ အကြံပေးခြင်း,"1️⃣9️⃣ အားကစား (Sports) Coach** - ဘောလုံး၊ ဘတ်စကက်၊ ကြက်တောင်၊ အပြေး၊ အလေးမ၊ Fitness နှင့် အခြားအားကစားနည်းများ၊ လေ့ကျင့်ခန်းအစီအစဉ်၊ အာဟာရနှင့် အားကစားသမားများအတွက် အကြံပေးခြင်း။\n\n"
+    "မင်းရဲ့ အဓိက ကျွမ်းကျင်မှု နယ်ပယ် (၁၉) ခုက -\n"
+    "1️⃣ Life Coach, 2️⃣ Relationship Coach, 3️⃣ Money Mindset, 4️⃣ Productivity, 5️⃣ Fitness, 6️⃣ Business, 7️⃣ Tech, 8️⃣ Video Editing & Design, 9️⃣ Trend & AI Tools, "
+    "🔟 စိုက်ပျိုးရေး, 1️⃣1️⃣ မွေးမြူရေး, 1️⃣2️⃣ မြန်မာ့လုပ်ငန်း, 1️⃣3️⃣ ပညာရေး, 1️⃣4️⃣ ဥပဒေ, 1️⃣5️⃣ ကျန်းမာရေး, 1️⃣6️⃣ စားသောက်ကုန်, "
+    "1️⃣7️⃣ ဗေဒင် (Astrology) Coach - မွေးရက်ဇယား၊ ရာသီခွင် (Zodiac), နက္ခတ်ဗေဒင်၊ မြန်မာ့ရိုးရာဗေဒင်၊ ကံကြမ္မာ၊ နေ့ရက်ရွေးချယ်ခြင်း၊ အတိတ်နိမိတ်၊ အလုပ်အကိုင်နှင့် အိမ်ထောင်ရေးအတွက် ဗေဒင်အကြံပေးခြင်း, "
+    "1️⃣8️⃣ သိုင်းပညာ (Martial Arts) Coach - မြန်မာ့ရိုးရာလက်ဝှေ့၊ ကိုယ်ခံပညာ၊ တိုက်ခိုက်ရေးအနုပညာ၊ လေ့ကျင့်ခန်းနည်းစနစ်များ၊ သိုင်းဆရာကြီးများ၏ စည်းကမ်းများ အကြံပေးခြင်း, "
+    "1️⃣9️⃣ အားကစား (Sports) Coach - ဘောလုံး၊ ဘတ်စကက်၊ ကြက်တောင်၊ အပြေး၊ အလေးမ၊ Fitness နှင့် အခြားအားကစားနည်းများ၊ လေ့ကျင့်ခန်းအစီအစဉ်၊ အာဟာရနှင့် အားကစားသမားများအတွက် အကြံပေးခြင်း။\n\n"
     "အသုံးပြုသူရဲ့ မေးခွန်းကို ကျွမ်းကျင်သူတစ်ယောက်လို ဖြေပေးရမယ်။\n"
     "အဖြေတွေကို မြန်မာလိုပဲ ပြန်ရမယ်။ လေးလေးနက်နက်၊ ရယ်စရာ၊ မိတ်ဆွေလို ပြောရမယ်။\n"
     "ဥပဒေ၊ ကျန်းမာရေး၊ ငွေကြေးဆိုင်ရာ အကြံပြုချက်များသည် အထွေထွေ အချက်အလက်သာဖြစ်ပြီး ကျွမ်းကျင်သူများနှင့် တိုင်ပင်ရန် သတိပေးရမယ်။"
@@ -527,8 +531,11 @@ async def ask_model(prompt: str, user_id: str = None) -> str:
     if user_id:
         user_data = get_user(user_id)
         if user_data:
-            (plan, usage, proof_status, _, _, _, goals, weaknesses, dream, career, money_mindset, relationship) = user_data
-            if any([goals, weaknesses, dream, career, money_mindset, relationship]):
+            # 👇 ဒီမှာ (၁၃) ခုနဲ့ ဖြေရှင်းပါ (birthdate ထည့်ပြီး)
+            (plan, usage, proof_status, _, _, _, goals, weaknesses, dream, career, money_mindset, relationship, birthdate) = user_data
+            
+            # birthdate ကိုပါ စစ်ဆေးပါ
+            if any([goals, weaknesses, dream, career, money_mindset, relationship, birthdate]):
                 user_context = "\n\n[အသုံးပြုသူ၏ ကိုယ်ရေးအချက်အလက်များ]\n"
                 if goals: user_context += f"- ပန်းတိုင်: {goals}\n"
                 if career: user_context += f"- အလုပ်အကိုင်: {career}\n"
@@ -536,6 +543,7 @@ async def ask_model(prompt: str, user_id: str = None) -> str:
                 if weaknesses: user_context += f"- အားနည်းချက်: {weaknesses}\n"
                 if money_mindset: user_context += f"- ငွေကြေးစိတ်ဓာတ်: {money_mindset}\n"
                 if relationship: user_context += f"- ဆက်ဆံရေး: {relationship}\n"
+                if birthdate: user_context += f"- မွေးနေ့: {birthdate}\n"  # 👈 ဗေဒင်အတွက် မွေးနေ့ကို AI ဆီ ပို့ပေးမယ်
 
     try:
         async with httpx.AsyncClient(timeout=30) as client:
@@ -710,7 +718,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user:
         add_user(user_id, "free")
         user = ("free", 0, "none", None, 0, None, None, None, None, None, None, None)
-    (plan, usage, proof_status, _, price, _, goals, weaknesses, dream, career, money_mindset, relationship) = user
+    (plan, usage, proof_status, _, price, _, goals, weaknesses, dream, career, money_mindset, relationship, birthdate FROM users WHERE user_id=?") = user
     limit = PLAN_LIMITS[plan]["limit"]
     remaining = limit - usage
     price_usd = get_price_usd(price)
@@ -775,7 +783,7 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Format: field : value")
         return
     field_raw, value = [p.strip() for p in text.split(":", 1)]
-    field_map = {"goals": "goals", "weaknesses": "weaknesses", "dream": "dream", "career": "career", "money_mindset": "money_mindset", "relationship": "relationship"}
+    field_map = {"goals": "goals", "weaknesses": "weaknesses", "dream": "dream", "career": "career", "money_mindset": "money_mindset", "relationship": "relationship", "birthdate": "birthdate",}
     key = field_map.get(field_raw)
     if not key:
         await update.message.reply_text("❌ field မမှန်ပါ။ goals/weaknesses/dream/career/money_mindset/relationship ထဲက တစ်ခုသုံးပါ။")
