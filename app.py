@@ -39,6 +39,13 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 ADMIN_IDS = [1119128553]  # @Thawkhyan999
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "mysecret123")
 
+# ====== NEW: Multi-Admin Users (Username + Password) ======
+ADMIN_USERS = {
+    "admin": "mysecret123",       # ခင်ဗျား
+    "thawkhyan": "yourpass123",   # ခင်ဗျားရဲ့ အမည်
+    # နောက်ထပ် Admin တွေ ထပ်ထည့်နိုင်ပါတယ်
+}
+
 EXCHANGE_RATE = 4545
 
 PAYMENT_INFO = (
@@ -65,13 +72,14 @@ BOT_NAMES = ["မစ္စတာသန်း", "ကိုသန်း", "သန�
 flask_app = Flask(__name__)
 
 
-def check_auth(password):
-    return password == ADMIN_PASSWORD
+# ====== NEW: Flask Auth (Username + Password) ======
+def check_auth(username, password):
+    return username in ADMIN_USERS and ADMIN_USERS[username] == password
 
 
 def authenticate():
     return Response(
-        "❌ Unauthorized! Password required.",
+        "❌ Unauthorized! Username and Password required.",
         401,
         {"WWW-Authenticate": 'Basic realm="Login Required"'},
     )
@@ -81,7 +89,7 @@ def requires_auth(f):
     @functools.wraps(f)
     def decorated(*args, **kwargs):
         auth = request.authorization
-        if not auth or not check_auth(auth.password):
+        if not auth or not check_auth(auth.username, auth.password):
             return authenticate()
         return f(*args, **kwargs)
 
@@ -126,6 +134,26 @@ def admin_proofs():
             html += "<td>-</td>"
         html += "</tr>"
     html += "</table>"
+    return html
+
+
+# ====== NEW: User List Dashboard ======
+@flask_app.route("/admin/users")
+@requires_auth
+def admin_users():
+    conn = sqlite3.connect("bot_users.db")
+    c = conn.cursor()
+    c.execute("SELECT user_id, plan, usage_count, proof_status FROM users ORDER BY user_id")
+    results = c.fetchall()
+    conn.close()
+
+    html = "<h2>👥 User List</h2>"
+    html += "<table border='1' cellpadding='5' style='border-collapse:collapse;'>"
+    html += "<tr><th>User ID</th><th>Plan</th><th>Usage</th><th>Proof Status</th></tr>"
+    for uid, plan, usage, status in results:
+        html += f"<tr><td>{uid}</td><td>{plan}</td><td>{usage}</td><td>{status}</td></tr>"
+    html += "</table>"
+    html += f"<br><p><b>Total Users: {len(results)}</b></p>"
     return html
 
 
@@ -581,12 +609,10 @@ async def is_bot_mentioned(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     
     text = update.message.text.lower()
     
-    # Check if any bot name is in the text
     for name in BOT_NAMES:
         if name.lower() in text:
             return True
     
-    # Also check if bot username is mentioned with @
     bot_username = (await context.bot.get_me()).username
     if bot_username and f"@{bot_username.lower()}" in text:
         return True
@@ -1068,7 +1094,6 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ====== Main Message Handler with Group Chat Name Mention ======
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Only handle text messages
     if not update.message or not update.message.text:
         return
     
@@ -1076,33 +1101,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_type = update.effective_chat.type
     text = update.message.text
     
-    # ====== Auto Subscribe: free/basic/premium/premium_plus ======
     if text.lower() in ["free", "basic", "premium", "premium_plus"]:
         context.args = [text.lower()]
         await subscribe(update, context)
         return
     
-    # ====== Group Chat: Check if bot is mentioned ======
     if chat_type in ["group", "supergroup"]:
-        # Check if bot is mentioned by name (ကိုသန်း) or username (@BotUsername)
         if await is_bot_mentioned(update, context):
-            # Remove the bot name from the question
             for name in BOT_NAMES:
                 if name.lower() in text.lower():
                     text = re.sub(name, "", text, flags=re.IGNORECASE)
             
-            # Also remove @username if present
             bot_username = (await context.bot.get_me()).username
             if bot_username:
                 text = re.sub(f"@{bot_username}", "", text, flags=re.IGNORECASE)
             
             text = text.strip()
             
-            # If there's no question after removing bot name, ignore
             if not text:
                 return
             
-            # Check limit and respond
             if not check_limit(user_id):
                 await update.message.reply_text(
                     "❌ သုံးခွင့်ကုန်သွားပါပြီ။ Plan အသစ်ရွေးပါ။"
@@ -1122,7 +1140,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(answer, disable_web_page_preview=True)
             return
     
-    # ====== Private Chat: Normal message handling ======
     if chat_type == "private":
         if not check_limit(user_id):
             await update.message.reply_text(
@@ -1180,7 +1197,7 @@ def main():
         MessageHandler(filters.PHOTO & (~filters.COMMAND), photo_handler)
     )
 
-    # Message handler (for private chats and group mentions)
+    # Message handler
     application.add_handler(
         MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message)
     )
