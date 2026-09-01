@@ -29,7 +29,7 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or "8617869426:AAHzomx
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY") or "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"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-ADMIN_IDS = [1119128553]
+ADMIN_IDS = [1119128553]  # @Thawkhyan999
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "mysecret123")
 
 EXCHANGE_RATE = 4545
@@ -184,7 +184,6 @@ def init_db():
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
     
-    # Users table with profile columns
     c.execute("""CREATE TABLE IF NOT EXISTS users (
         user_id TEXT PRIMARY KEY,
         plan TEXT DEFAULT 'free',
@@ -201,7 +200,6 @@ def init_db():
         relationship TEXT
     )""")
     
-    # Referrals table
     c.execute("""
     CREATE TABLE IF NOT EXISTS referrals (
         inviter_id TEXT,
@@ -210,7 +208,6 @@ def init_db():
     )
     """)
     
-    # Habits table
     c.execute("""
     CREATE TABLE IF NOT EXISTS habits (
         user_id TEXT,
@@ -219,7 +216,6 @@ def init_db():
     )
     """)
     
-    # Migration for missing columns
     for col in ["proof_status", "proof_file_id", "price", "proof_timestamp", 
                 "goals", "weaknesses", "dream", "career", "money_mindset", "relationship"]:
         try:
@@ -469,7 +465,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🙏 မင်္ဂလာပါ။ ကျွန်တော် မစ္စတာသန်းပါ။\n"
         "သင့်ရဲ့ လက်ထောက် အဖြစ်နဲ့ ကိုယ်ရေးကိုယ်တာ၊ အလုပ်အကိုင်နဲ့ တခြားလုပ်ဆောင်ရမယ့် အရာတွေကို ယုံကြည်စွာ ဖြေရှင်းပေးဖို့ အသင့်ပါဗျ။\n\n"
         "Commands:\n"
-        "/subscribe <plan> - Plan ပြောင်းရန် (free/basic/premium/premium_plus)\n"
+        "/subscribe - Plan ပြောင်းရန် (free/basic/premium/premium_plus)\n"
         "/ask <question> - AI ကို မေးမြန်းရန်\n"
         "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
         "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n"
@@ -486,7 +482,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📌 **အသုံးပြုနည်း**\n\n"
         "/start - ဘော့စတင်\n"
         "/help - အကူအညီ\n"
-        "/subscribe <plan> - Plan ပြောင်းရန် (free/basic/premium/premium_plus)\n"
+        "/subscribe - Plan ပြောင်းရန် (free/basic/premium/premium_plus)\n"
         "/ask <question> - AI ကို မေးမြန်းရန်\n"
         "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
         "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n"
@@ -524,14 +520,6 @@ async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    plan = context.args[0] if context.args else "free"
-    
-    if plan not in PLAN_LIMITS:
-        allowed = ", ".join(PLAN_LIMITS.keys())
-        await update.message.reply_text(f"❌ '{plan}' မရှိပါ။ ရနိုင်တဲ့ Plan: {allowed}")
-        return
-    
     keyboard = [
         [InlineKeyboardButton("📌 Free", callback_data="sub_free")],
         [InlineKeyboardButton("⭐ Basic (10,000 MMK)", callback_data="sub_basic")],
@@ -671,7 +659,8 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text(
             "Usage: /profile <field> : <value>\n"
-            "Example: /profile goals : ၃ နှစ်အတွင်း ကိုယ်ပိုင်လုပ်ငန်းဖွင့်မယ်"
+            "Example: /profile goals : ၃ နှစ်အတွင်း ကိုယ်ပိုင်လုပ်ငန်းဖွင့်မယ်\n\n"
+            "Allowed fields: goals, weaknesses, dream, career, money_mindset, relationship"
         )
         return
     
@@ -691,7 +680,9 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
     key = field_map.get(field_raw)
     if not key:
-        await update.message.reply_text("❌ field မမှန်ပါ။ goals/weaknesses/dream/career/money_mindset/relationship ထဲက တစ်ခုသုံးပါ။")
+        await update.message.reply_text(
+            "❌ field မမှန်ပါ။ goals/weaknesses/dream/career/money_mindset/relationship ထဲက တစ်ခုသုံးပါ။"
+        )
         return
     
     update_profile(user_id, key, value)
@@ -700,7 +691,9 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def habit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     if not context.args:
-        await update.message.reply_text("Usage: /habit <habit>\nExample: /habit နေ့တိုင်း ၃၀ မိနစ်စာဖတ်မယ်")
+        await update.message.reply_text(
+            "Usage: /habit <habit>\nExample: /habit နေ့တိုင်း ၃၀ မိနစ်စာဖတ်မယ်"
+        )
         return
     habit_text = " ".join(context.args)
     add_habit(user_id, habit_text)
@@ -716,6 +709,41 @@ async def myhabits(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for h, ts in habits:
         lines.append(f"• {h} ({ts[:10]})")
     await update.message.reply_text("\n".join(lines))
+
+async def proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    message = update.message
+
+    if not message.photo:
+        await message.reply_text("📸 Screenshot proof ကို Photo အနေနဲ့ပို့ပါ။")
+        return
+
+    file_id = message.photo[-1].file_id
+    conn = sqlite3.connect("bot_users.db")
+    c = conn.cursor()
+    c.execute(
+        "UPDATE users SET proof_file_id=?, proof_status='pending', proof_timestamp=? WHERE user_id=?",
+        (file_id, datetime.utcnow().isoformat(), user_id)
+    )
+    conn.commit()
+    conn.close()
+
+    await message.reply_text("✅ Proof ကို လက်ခံပြီးပါပြီ။ Admin က စစ်ဆေးပြီး approve/reject လုပ်ပေးမယ်။")
+    
+    # Notify admins
+    for admin_id in ADMIN_IDS:
+        try:
+            await context.bot.send_message(
+                chat_id=admin_id,
+                text=f"📋 User {user_id} က Proof တင်လိုက်ပါပြီ။"
+            )
+            await context.bot.send_photo(
+                chat_id=admin_id,
+                photo=file_id,
+                caption=f"Proof from User {user_id}\nApprove: /approve_proof {user_id}\nReject: /reject_proof {user_id}"
+            )
+        except Exception as e:
+            logger.error(f"Admin notify error: {e}")
 
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in ADMIN_IDS:
@@ -770,66 +798,6 @@ async def verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.close()
     
     await update.message.reply_text(f"✅ User {target_user} upgraded to {plan} plan!")
-
-# ====== Proof System ======
-async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    photo = update.message.photo[-1].file_id
-    timestamp = update.message.date
-    
-    conn = sqlite3.connect("bot_users.db")
-    c = conn.cursor()
-    
-    # Duplicate proof check
-    c.execute("SELECT user_id FROM users WHERE proof_file_id=? AND user_id!=?", (photo, user_id))
-    duplicate = c.fetchone()
-    if duplicate:
-        conn.close()
-        await update.message.reply_text(
-            "⚠️ ဒီ Screenshot ကို အခြားသူတစ်ယောက်ကလည်း သုံးထားပါတယ်။ "
-            "Fraud ဖြစ်နိုင်ပါတယ်။ Proof အသစ်တင်ပေးပါ။"
-        )
-        return
-    
-    # Timestamp check (48 hours)
-    if timestamp < datetime.utcnow() - timedelta(hours=48):
-        conn.close()
-        await update.message.reply_text(
-            "⚠️ Proof screenshot ဟာ 48 နာရီကျော်ပြီးသား ဖြစ်နေပါတယ်။ "
-            "အသစ်တင်ပေးပါ။"
-        )
-        return
-    
-    # Ensure user exists
-    user = get_user(user_id)
-    if not user:
-        add_user(user_id, "free")
-    
-    # Save proof
-    c.execute("""
-        UPDATE users 
-        SET proof_file_id=?, proof_status='pending', proof_timestamp=? 
-        WHERE user_id=?
-    """, (photo, timestamp.isoformat(), user_id))
-    conn.commit()
-    conn.close()
-    
-    await update.message.reply_text("📸 Proof လက်ခံပြီးပါပြီ။ Admin စစ်ဆေးနေပါမယ်။")
-    
-    # Notify admins
-    for admin_id in ADMIN_IDS:
-        try:
-            await context.bot.send_message(
-                chat_id=admin_id,
-                text=f"📋 User {user_id} က Proof တင်လိုက်ပါပြီ။"
-            )
-            await context.bot.send_photo(
-                chat_id=admin_id,
-                photo=photo,
-                caption=f"Proof from User {user_id}\nApprove: /approve_proof {user_id}\nReject: /reject_proof {user_id}"
-            )
-        except Exception as e:
-            logger.error(f"Admin notify error: {e}")
 
 async def pending_proofs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in ADMIN_IDS:
@@ -939,47 +907,49 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(answer, disable_web_page_preview=True)
 
-# ====== Main Application Setup ======
+# ====== Main Function ======
 def main():
     init_db()
     
-    app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
     # ----- User Commands -----
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("help", help_command))
-    app.add_handler(CommandHandler("subscribe", subscribe))
-    app.add_handler(CommandHandler("status", status))
-    app.add_handler(CommandHandler("ask", ask))
-    app.add_handler(CommandHandler("referral", referral))
-    app.add_handler(CommandHandler("profile", profile))
-    app.add_handler(CommandHandler("habit", habit))
-    app.add_handler(CommandHandler("myhabits", myhabits))
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("subscribe", subscribe))
+    application.add_handler(CommandHandler("status", status))
+    application.add_handler(CommandHandler("ask", ask))
+    application.add_handler(CommandHandler("referral", referral))
+    application.add_handler(CommandHandler("profile", profile))
+    application.add_handler(CommandHandler("habit", habit))
+    application.add_handler(CommandHandler("myhabits", myhabits))
+    application.add_handler(CommandHandler("proof", proof))
 
     # ----- Admin Commands -----
-    app.add_handler(CommandHandler("broadcast", broadcast))
-    app.add_handler(CommandHandler("verify", verify))
-    app.add_handler(CommandHandler("pending_proofs", pending_proofs))
-    app.add_handler(CommandHandler("approve_proof", approve_proof))
-    app.add_handler(CommandHandler("reject_proof", reject_proof))
+    application.add_handler(CommandHandler("broadcast", broadcast))
+    application.add_handler(CommandHandler("verify", verify))
+    application.add_handler(CommandHandler("pending_proofs", pending_proofs))
+    application.add_handler(CommandHandler("approve_proof", approve_proof))
+    application.add_handler(CommandHandler("reject_proof", reject_proof))
 
     # ----- Non-Command Handlers -----
-    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-    app.add_handler(CallbackQueryHandler(button_handler))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(CallbackQueryHandler(button_handler))
+    application.add_handler(MessageHandler(filters.PHOTO, proof))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # ----- Scheduler & Flask Threads -----
-    scheduler_thread = threading.Thread(target=run_scheduler, args=(app.bot,), daemon=True)
+    # ----- Scheduler Thread -----
+    scheduler_thread = threading.Thread(target=run_scheduler, args=(application.bot,), daemon=True)
     scheduler_thread.start()
     logger.info("🔄 Scheduler thread started.")
 
+    # ----- Flask Thread -----
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
     logger.info("🌐 Flask server thread started.")
 
     # ----- Start Bot -----
     logger.info("🤖 Bot ready and polling started!")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 def run_flask():
     port = int(os.environ.get("PORT", 5000))
