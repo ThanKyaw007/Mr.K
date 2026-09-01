@@ -38,6 +38,7 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 ADMIN_IDS = [1119128553]  # @Thawkhyan999
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "mysecret123")
+DAILY_COACHING_TIME = os.environ.get("DAILY_COACHING_TIME", "08:00")
 
 EXCHANGE_RATE = 4545
 
@@ -563,9 +564,9 @@ async def send_daily_coaching(bot):
 # ====== Scheduler ======
 def run_scheduler(bot):
     schedule.every(30).days.do(reset_usage)
-    schedule.every().day.at("08:00").do(lambda: asyncio.run(send_daily_coaching(bot)))
+    schedule.every().day.at(DAILY_COACHING_TIME).do(lambda: asyncio.run(send_daily_coaching(bot)))
     logger.info(
-        "⏰ Scheduler started. Reset usage every 30 days, daily coaching at 8:00 AM."
+        f"⏰ Scheduler started. Reset usage every 30 days, daily coaching at {DAILY_COACHING_TIME}."
     )
 
     while True:
@@ -882,7 +883,7 @@ async def myhabits(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text)
 
 
-# ====== Proof (photo upload) ======
+# ====== Proof System (Updated with Admin Notification) ======
 async def proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "📸 ငွေသွင်း proof screenshot ကို ဒီ chat ထဲမှာ Photo အနေနဲ့ ပို့ပေးပါ။"
@@ -902,11 +903,24 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Admin က စစ်ဆေးပြီး approve/reject လုပ်ပေးပါမယ်။"
     )
 
+    # Notify Admin
+    for admin_id in ADMIN_IDS:
+        try:
+            await context.bot.send_photo(
+                chat_id=admin_id,
+                photo=file_id,
+                caption=f"📋 Proof from User {user_id}\n"
+                        f"Approve: /approve_proof {user_id}\n"
+                        f"Reject: /reject_proof {user_id}"
+            )
+        except Exception as e:
+            logger.error(f"Admin notify error: {e}")
 
-# ====== Admin Commands (simple) ======
+
+# ====== Admin Commands ======
 async def verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    if user_id not in [str(a) for a in ADMIN_IDS]:
+    user_id = update.effective_user.id
+    if user_id not in ADMIN_IDS:
         await update.message.reply_text("❌ Admin only.")
         return
 
@@ -935,8 +949,8 @@ async def verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def pending_proofs(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    if user_id not in [str(a) for a in ADMIN_IDS]:
+    user_id = update.effective_user.id
+    if user_id not in ADMIN_IDS:
         await update.message.reply_text("❌ Admin only.")
         return
 
@@ -954,13 +968,13 @@ async def pending_proofs(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = "📋 **Pending Proofs**\n"
     for uid, plan, file_id, ts in rows:
-        text += f"\n• User: {uid} | Plan: {plan} | File: {file_id} | Time: {ts}"
+        text += f"\n• User: {uid} | Plan: {plan} | Time: {ts}"
     await update.message.reply_text(text)
 
 
 async def approve_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    if user_id not in [str(a) for a in ADMIN_IDS]:
+    user_id = update.effective_user.id
+    if user_id not in ADMIN_IDS:
         await update.message.reply_text("❌ Admin only.")
         return
 
@@ -993,8 +1007,8 @@ async def approve_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def reject_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    if user_id not in [str(a) for a in ADMIN_IDS]:
+    user_id = update.effective_user.id
+    if user_id not in ADMIN_IDS:
         await update.message.reply_text("❌ Admin only.")
         return
 
@@ -1016,8 +1030,8 @@ async def reject_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    if user_id not in [str(a) for a in ADMIN_IDS]:
+    user_id = update.effective_user.id
+    if user_id not in ADMIN_IDS:
         await update.message.reply_text("❌ Admin only.")
         return
 
@@ -1080,7 +1094,8 @@ def main():
 
     # Run Flask + Scheduler in threads
     def run_flask():
-        flask_app.run(host="0.0.0.0", port=5000)
+        port = int(os.environ.get("PORT", 5000))
+        flask_app.run(host="0.0.0.0", port=port)
 
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
