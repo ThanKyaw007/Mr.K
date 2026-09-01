@@ -18,8 +18,7 @@ ADMIN_ID = 123456789  # မင်း Telegram ID ထည့်ပါ
 ADMIN_PASSWORD = "mysecret123"  # Flask Dashboard Password
 
 # Payment Info
-PAYMENT_PHONE = "09426419462"
-PAYMENT_METHODS = "KBZ Pay / Wave Pay"
+PAYMENT_INFO = "💳 **ငွေလွှဲရန်**\nKBZPay: 09426419462\nWavePay: 09426419462"
 
 # Plan Limits (Limit + Price in MMK)
 PLAN_LIMITS = {
@@ -141,7 +140,6 @@ def init_db():
         proof_file_id TEXT,
         price INTEGER DEFAULT 0
     )""")
-    # Migration for missing columns
     try:
         c.execute("ALTER TABLE users ADD COLUMN proof_status TEXT DEFAULT 'none'")
     except sqlite3.OperationalError:
@@ -244,8 +242,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/subscribe <plan> - Plan ပြောင်းရန် (free/basic/premium)\n"
         "/ask <question> - AI ကို မေးမြန်းရန်\n"
         "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
-        "/proof - ငွေလွှဲ Screenshot proof တင်ရန်\n"
-        "/help - အကူအညီ"
+        "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n"
+        "/help - အကူအညီ\n\n"
+        "💡 သိကောင်းစရာ: `free`, `basic`, `premium` လို့ရိုက်ရင် အလိုအလျောက် subscribe လုပ်ပေးမယ်။"
     )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -253,15 +252,16 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📌 **အသုံးပြုနည်း**\n\n"
         "/start - ဘော့စတင်\n"
         "/help - အကူအညီ\n"
-        "/subscribe <plan> - Plan ရွေးချယ်ရန် (free/basic/premium)\n"
+        "/subscribe <plan> - Plan ပြောင်းရန် (free/basic/premium)\n"
         "/ask <question> - AI ကို မေးမြန်းရန်\n"
         "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
-        "/proof - ငွေလွှဲ Screenshot proof တင်ရန်\n\n"
+        "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n\n"
         "**Admin Commands:**\n"
         "/verify <user_id> <plan> - Plan ပြောင်းရန်\n"
         "/pending_proofs - Pending Proofs စာရင်းကြည့်ရန်\n"
         "/approve_proof <user_id> - Proof အတည်ပြုရန်\n"
-        "/reject_proof <user_id> - Proof ပယ်ရန်"
+        "/reject_proof <user_id> - Proof ပယ်ရန်\n\n"
+        "💡 **Auto Subscribe:** `free`, `basic`, `premium` လို့ရိုက်ရင် အလိုအလျောက် subscribe လုပ်ပေးမယ်။"
     )
 
 async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -273,7 +273,6 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ '{plan}' မရှိပါ။ ရနိုင်တဲ့ Plan: {allowed}")
         return
     
-    # Plan ကို တန်းပြီး upgrade မလုပ်ဘဲ proof တောင်းအောင် ပြင်ထားတယ်
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
     c.execute("UPDATE users SET plan=?, proof_status='waiting', price=? WHERE user_id=?",
@@ -284,21 +283,8 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"📌 **{plan}** Plan ကို ရွေးလိုက်ပါပြီ။\n"
         f"💰 စျေးနှုန်း: {PLAN_LIMITS[plan]['price']:,} MMK / month\n\n"
-        "📸 ကျေးဇူးပြုပြီး ငွေသွင်း proof screenshot ကို ပို့ပါ။\n"
-        "💳 **ငွေလွှဲရန်:**\n"
-        f"• {PAYMENT_METHODS}\n"
-        f"• ဖုန်းနံပါတ်: `{PAYMENT_PHONE}`\n\n"
-        "Screenshot ကို ဒီ Chat ထဲကို တိုက်ရိုက်ပို့ပါ။"
-    )
-
-async def proof_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """User ကို Proof ပို့ဖို့ ညွှန်ကြားတဲ့ Command"""
-    await update.message.reply_text(
-        "📸 ကျေးဇူးပြုပြီး ငွေလွှဲ Screenshot proof ကို ပို့ပါ။\n\n"
-        "💳 **ငွေလွှဲရန်:**\n"
-        f"• {PAYMENT_METHODS}\n"
-        f"• ဖုန်းနံပါတ်: `{PAYMENT_PHONE}`\n\n"
-        "Screenshot ကို ဒီ Chat ထဲကို တိုက်ရိုက်ပို့ပါ။"
+        f"📸 ကျေးဇူးပြုပြီး ငွေသွင်း proof screenshot ကို ပို့ပါ။\n\n"
+        f"{PAYMENT_INFO}"
     )
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -311,22 +297,13 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     limit = PLAN_LIMITS[plan]["limit"]
     remaining = limit - usage
     
-    status_map = {
-        "none": "မရှိသေး",
-        "waiting": "စောင့်ဆိုင်းနေ (Proof ပို့ရန်)",
-        "pending": "စစ်ဆေးနေပါပြီ",
-        "approved": "အတည်ပြုပြီး",
-        "rejected": "ပယ်ချထား"
-    }
-    status_text = status_map.get(proof_status, proof_status)
-    
     await update.message.reply_text(
         f"📊 **Your Status**\n"
         f"📌 Plan: **{plan}**\n"
         f"💰 စျေးနှုန်း: {price:,} MMK / month\n"
         f"📊 သုံးပြီးသား: {usage} / {limit} ကြိမ်\n"
         f"✅ ကျန်သုံးခွင့်: **{remaining}** ကြိမ်\n"
-        f"🔍 Proof Status: **{status_text}**"
+        f"🔍 Proof Status: **{proof_status}**"
     )
 
 async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -394,18 +371,6 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(user_id)
     if not user:
         add_user(user_id, "free")
-        await update.message.reply_text("❌ ပထမဆုံး /subscribe နဲ့ Plan ကိုရွေးပါ။")
-        return
-    
-    plan, usage, proof_status, _, _ = user
-    
-    # proof_status က waiting မဟုတ်ရင် သတိပေးပါ
-    if proof_status != "waiting":
-        await update.message.reply_text(
-            "📸 ခင်ဗျား Plan ကို ရွေးထားပြီးသားပါ။\n"
-            "Plan အသစ်အတွက် /subscribe နဲ့ ရွေးပါ။"
-        )
-        return
     
     file_id = update.message.photo[-1].file_id
     
@@ -416,10 +381,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.commit()
     conn.close()
     
-    await update.message.reply_text(
-        "📸 Screenshot proof ကို လက်ခံပြီးပါပြီ။\n"
-        "Admin စစ်ဆေးနေပါမယ်။ အတည်ပြုပြီးရင် သတိပေးစာ ပို့ပေးပါမယ်။"
-    )
+    await update.message.reply_text("📸 Screenshot proof ကို လက်ခံပြီးပါပြီ။ Admin စစ်ဆေးနေပါမယ်။")
 
 async def pending_proofs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -428,7 +390,7 @@ async def pending_proofs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
-    c.execute("SELECT user_id, plan, proof_file_id FROM users WHERE proof_status='pending'")
+    c.execute("SELECT user_id, proof_file_id FROM users WHERE proof_status='pending'")
     results = c.fetchall()
     conn.close()
     
@@ -437,8 +399,8 @@ async def pending_proofs(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     msg = "📋 **Pending Proofs List:**\n\n"
-    for uid, plan, fid in results:
-        msg += f"• User ID: `{uid}`\n  Plan: {plan}\n  File ID: `{fid[:20] if fid else '-'}...`\n\n"
+    for uid, fid in results:
+        msg += f"• User ID: `{uid}`\n  File ID: `{fid[:20]}...`\n\n"
     
     if len(msg) > 4000:
         for i in range(0, len(msg), 4000):
@@ -511,37 +473,39 @@ async def reject_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         pass
 
+# ====== NEW: handle_message with Auto Subscribe ======
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    user_message = update.message.text
-    bot_name = get_bot_name(user_message)
+    original_text = update.message.text
+    user_text_lower = original_text.lower()
     
+    # Auto Subscribe: သုံးပြီးသူက "free", "basic", "premium" လို့ရိုက်လိုက်ရင်
+    if user_text_lower in ["free", "basic", "premium"]:
+        context.args = [user_text_lower]  # plan name in lowercase
+        await subscribe(update, context)
+        return
+    
+    # အခြား AI မေးမြန်းမှုတွေ
+    user_id = str(update.effective_user.id)
     if not check_limit(user_id):
-        await update.message.reply_text(
-            "❌ သင့် Plan အတွက် သုံးခွင့်ကုန်သွားပါပြီ။\n"
-            "Plan အသစ်သို့ အဆင့်မြှင့်ရန် /subscribe ကိုသုံးပါ။"
-        )
+        await update.message.reply_text("❌ သုံးခွင့်ကုန်သွားပါပြီ။ Plan အသစ်ရွေးပါ။")
         return
     
     await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
-    
     try:
-        answer = await ask_model(user_message)
+        answer = await ask_model(original_text)  # original text ကိုပို့မယ်
         answer = clean_text(answer)
     except Exception as e:
         await update.message.reply_text(f"⚠️ Error: {str(e)[:100]}")
         return
     
+    increment_usage(user_id)
+    
+    # Bot name ပါရင် ထည့်ပေးမယ်
+    bot_name = get_bot_name(original_text)
     if bot_name:
         answer = f"{bot_name} ပြောတယ်... {answer}"
     
-    increment_usage(user_id)
-    
-    if len(answer) > 4000:
-        for i in range(0, len(answer), 4000):
-            await update.message.reply_text(answer[i:i+4000], disable_web_page_preview=True)
-    else:
-        await update.message.reply_text(answer, disable_web_page_preview=True)
+    await update.message.reply_text(answer, disable_web_page_preview=True)
 
 # ====== Run Bot ======
 def run_bot():
@@ -551,7 +515,6 @@ def run_bot():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("subscribe", subscribe))
-    app.add_handler(CommandHandler("proof", proof_command))  # New proof command
     app.add_handler(CommandHandler("status", status))
     app.add_handler(CommandHandler("ask", ask))
     app.add_handler(CommandHandler("verify", verify))
