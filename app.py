@@ -71,7 +71,25 @@ BOT_NAMES = ["မစ္စတာသန်း", "ကိုသန်း", "သန�
 # ====== Flask App ======
 flask_app = Flask(__name__)
 
-# ====== Flask Routes (ဒီနေရာမှာ စတင်ထည့်ပါ) ======
+# ====== Flask Auth Functions ======
+def check_auth(username, password):
+    return username in ADMIN_USERS and ADMIN_USERS[username] == password
+
+def authenticate():
+    return Response(
+        "❌ Unauthorized! Username and Password required.",
+        401,
+        {"WWW-Authenticate": 'Basic realm="Login Required"'},
+    )
+
+def requires_auth(f):
+    @functools.wraps(f)
+    def decorated(*args, **kwargs):
+        auth = request.authorization
+        if not auth or not check_auth(auth.username, auth.password):
+            return authenticate()
+        return f(*args, **kwargs)
+    return decorated
 
 # ====== Flask Routes ======
 
@@ -123,10 +141,8 @@ def admin_users():
     html = "<h2>👥 User List</h2>"
     html += "<table border='1' cellpadding='5' style='border-collapse:collapse;'>"
     html += "<tr><th>User ID</th><th>Plan</th><th>Usage</th><th>Proof Status</th></tr>"
-    
     for uid, plan, usage, status in results:
         html += f"<tr><td>{uid}</td><td>{plan}</td><td>{usage}</td><td>{status}</td></tr>"
-    
     html += "</table>"
     html += f"<br><p><b>Total Users: {len(results)}</b></p>"
     return html
@@ -197,7 +213,6 @@ def reject_user(user_id):
     conn.commit()
     conn.close()
     return f"❌ User {user_id} proof rejected!"
-
 # ====== ဒီမှာ Flask Routes ပြီးဆုံးပါပြီ ======
 
 # ====== NEW: User List Dashboard ======
