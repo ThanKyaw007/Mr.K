@@ -695,10 +695,10 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         "📌 သင် ရွေးချင်တဲ့ Plan ကို ရွေးပါ။\n\n"
-        f"📊 Free: {PLAN_LIMITS['free']['limit']} ကြိမ် (အခမဲ့)\n"
-        f"📊 Basic: {PLAN_LIMITS['basic']['limit']} ကြိမ် (10,000 MMK)\n"
-        f"📊 Premium: {PLAN_LIMITS['premium']['limit']} ကြိမ် (30,000 MMK)\n"
-        f"👑 Premium+: {PLAN_LIMITS['premium_plus']['limit']} ကြိမ် (50,000 MMK) - VIP Coaching",
+        f"📊 Free: {PLAN_LIMITS['free']['limit']} (အခမဲ့)\n"
+        f"📊 Basic: {PLAN_LIMITS['basic']['limit']} (10,000 MMK)\n"
+        f"📊 Premium: {PLAN_LIMITS['premium']['limit']} (30,000 MMK)\n"
+        f"👑 Premium+: {PLAN_LIMITS['premium_plus']['limit']} (50,000 MMK) - VIP Coaching",
         reply_markup=reply_markup,
     )
 
