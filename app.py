@@ -245,8 +245,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
         "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n"
         "/help - အကူအညီ\n\n"
-        "💡 သိကောင်းစရာ: `free`, `basic`, `premium` လို့ရိုက်ရင် အလိုအလျောက် subscribe လုပ်ပေးမယ်။\n"
-        "အခမဲ့ သုံးချင်ရင် `free` နှိပ်ပါ၊ ပိုမိုအဆင့်မြင့်စွာ လုပ်ဆောင်စေချင်ရင် `basic` သို့မဟုတ် `premium` ကိုရွေးပြီး သုံးပါ။"
+        "💡 သိကောင်းစရာ: အခမဲ့ သုံးချင်ရင် `free` နှိပ်ပါ၊ ပိုမိုအဆင့်မြင့်စွာ လုပ်ဆောင်စေချင်ရင် `basic` သို့မဟုတ် `premium` ကိုရွေးပြီး သုံးပါ။"
     )
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
