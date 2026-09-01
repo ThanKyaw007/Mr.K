@@ -14,7 +14,8 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or "8617869426:AAHzomx
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY") or "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"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-ADMIN_ID = 123456789  # မင်း Telegram ID ထည့်ပါ
+# ✅ ခင်ဗျားရဲ့ Telegram ID ကို ထည့်ထားပါပြီ
+ADMIN_ID = 1119128553  # @Thawkhyan999
 ADMIN_PASSWORD = "mysecret123"  # Flask Dashboard Password
 
 # Payment Info
@@ -364,25 +365,20 @@ async def verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ User {target_user} upgraded to {plan} plan!")
 
 # ====== Proof System ======
-
-# 🔥 ဒီမှာ ပြင်ဆင်ထားတယ် (Admin ဆီ Instant Notification ထည့်ပြီး)
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     photo = update.message.photo[-1].file_id
     
-    # အသုံးပြုသူရှိမရှိ စစ်ပြီး မရှိရင် add လုပ်ပါ
     user = get_user(user_id)
     if not user:
         add_user(user_id, "free")
     
-    # DB update (proof_file_id နဲ့ status ကို pending ပြောင်းပါ)
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
     c.execute("UPDATE users SET proof_file_id=?, proof_status='pending' WHERE user_id=?", (photo, user_id))
     conn.commit()
     conn.close()
     
-    # User ကို အတည်ပြုစာ ပြန်ပို့ပါ
     await update.message.reply_text("📸 Proof လက်ခံပြီးပါပြီ။ Admin စစ်ဆေးနေပါမယ်။")
     
     # ✅ Admin ဆီကို ချက်ချင်းသတိပေးစာ (Instant Notification) ပို့ပါ
@@ -512,7 +508,7 @@ def run_bot():
     app.add_handler(CommandHandler("pending_proofs", pending_proofs))
     app.add_handler(CommandHandler("approve_proof", approve_proof))
     app.add_handler(CommandHandler("reject_proof", reject_proof))
-    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))  # ဒီမှာ ခေါ်သုံးတယ်
+    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
     print("✅ Bot ready!")
