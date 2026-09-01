@@ -364,14 +364,18 @@ async def verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(f"✅ User {target_user} upgraded to {plan} plan!")
 
-# ====== Proof System ======
+# ====== Proof System (with Notification) ======
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
+    user_name = update.effective_user.first_name or "User"
+    username = update.effective_user.username or "No username"
     
     user = get_user(user_id)
     if not user:
         add_user(user_id, "free")
+        user = get_user(user_id)
     
+    plan, usage, _, _, price = user
     file_id = update.message.photo[-1].file_id
     
     conn = sqlite3.connect("bot_users.db")
@@ -381,7 +385,33 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.commit()
     conn.close()
     
-    await update.message.reply_text("📸 Screenshot proof ကို လက်ခံပြီးပါပြီ။ Admin စစ်ဆေးနေပါမယ်။")
+    # 💬 Customer ကို ပြန်ကြားစာ
+    await update.message.reply_text(
+        "📸 Screenshot proof ကို လက်ခံပြီးပါပြီ။\n"
+        "Admin စစ်ဆေးနေပါမယ်။ ကျေးဇူးပါ။ 🙏"
+    )
+    
+    # 🔔 Admin ကို သတိပေးစာ ပို့မယ်
+    try:
+        admin_msg = (
+            f"🔔 **New Proof Received!**\n\n"
+            f"👤 User: {user_name}\n"
+            f"🆔 ID: `{user_id}`\n"
+            f"📛 Username: @{username}\n"
+            f"📌 Plan: **{plan}**\n"
+            f"💰 Price: {price:,} MMK\n"
+            f"📊 Usage: {usage}/{PLAN_LIMITS[plan]['limit']}\n\n"
+            f"📸 File ID: `{file_id}`\n\n"
+            f"✅ Approve: /approve_proof {user_id}\n"
+            f"❌ Reject: /reject_proof {user_id}"
+        )
+        await context.bot.send_message(
+            chat_id=ADMIN_ID,
+            text=admin_msg,
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        print(f"⚠️ Failed to send admin notification: {e}")
 
 async def pending_proofs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -473,14 +503,14 @@ async def reject_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         pass
 
-# ====== NEW: handle_message with Auto Subscribe ======
+# ====== handle_message with Auto Subscribe ======
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     original_text = update.message.text
     user_text_lower = original_text.lower()
     
     # Auto Subscribe: သုံးပြီးသူက "free", "basic", "premium" လို့ရိုက်လိုက်ရင်
     if user_text_lower in ["free", "basic", "premium"]:
-        context.args = [user_text_lower]  # plan name in lowercase
+        context.args = [user_text_lower]
         await subscribe(update, context)
         return
     
@@ -492,7 +522,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
     try:
-        answer = await ask_model(original_text)  # original text ကိုပို့မယ်
+        answer = await ask_model(original_text)
         answer = clean_text(answer)
     except Exception as e:
         await update.message.reply_text(f"⚠️ Error: {str(e)[:100]}")
@@ -500,7 +530,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     increment_usage(user_id)
     
-    # Bot name ပါရင် ထည့်ပေးမယ်
     bot_name = get_bot_name(original_text)
     if bot_name:
         answer = f"{bot_name} ပြောတယ်... {answer}"
