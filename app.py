@@ -9,7 +9,7 @@ import logging
 import schedule
 import time
 from datetime import datetime, timedelta
-from flask import Flask, request, Response, render_template_string
+from flask import Flask, request, Response
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 
@@ -48,37 +48,9 @@ def get_price_usd(price_mmk):
 
 BOT_NAMES = ["မစ္စတာသန်း"]
 
-# ====== Referral System ======
-REFERRAL_REWARDS = {
-    "free": 5,  # invite တစ်ယောက်လျှင် free limit ကို 5 ကြိမ် ပိုပေးမယ်
-    "basic": 10,
-    "premium": 20
-}
-
-def generate_referral_code(user_id):
-    import hashlib
-    return hashlib.md5(f"ref_{user_id}_salt".encode()).hexdigest()[:8]
-
-def get_referral_stats(user_id):
-    conn = sqlite3.connect("bot_users.db")
-    c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM referrals WHERE referrer_id=?", (user_id,))
-    count = c.fetchone()[0]
-    conn.close()
-    return count
-
-def add_referral(referrer_id, referred_id):
-    conn = sqlite3.connect("bot_users.db")
-    c = conn.cursor()
-    c.execute("INSERT OR IGNORE INTO referrals (referrer_id, referred_id, created_at) VALUES (?, ?, ?)",
-              (referrer_id, referred_id, datetime.utcnow().isoformat()))
-    conn.commit()
-    conn.close()
-
 # ====== Flask App ======
 flask_app = Flask(__name__)
 
-# ====== Flask Auth ======
 def check_auth(password):
     return password == ADMIN_PASSWORD
 
@@ -97,7 +69,6 @@ def requires_auth(f):
         return f(*args, **kwargs)
     return decorated
 
-# ====== Flask Routes ======
 @flask_app.route('/')
 def home():
     return "🤖 Bot is running! Visit /admin/proofs for dashboard."
@@ -128,7 +99,6 @@ def admin_proofs():
     html += "</table>"
     return html
 
-# ====== Feature: User Stats Dashboard ======
 @flask_app.route('/admin/stats')
 @requires_auth
 def admin_stats():
@@ -143,35 +113,24 @@ def admin_stats():
     c.execute("SELECT plan, COUNT(*) FROM users GROUP BY plan")
     plan_stats = c.fetchall()
     
-    # Today's active users
-    today = datetime.utcnow().date().isoformat()
-    c.execute("SELECT COUNT(DISTINCT user_id) FROM usage_logs WHERE date=?", (today,))
-    active_today = c.fetchone()[0] if c.fetchone() else 0
+    # Pending proofs
+    c.execute("SELECT COUNT(*) FROM users WHERE proof_status='pending'")
+    pending = c.fetchone()[0]
     
-    # Total referrals
-    c.execute("SELECT COUNT(*) FROM referrals")
-    total_refs = c.fetchone()[0]
+    # Today's usage
+    c.execute("SELECT SUM(usage_count) FROM users")
+    total_usage = c.fetchone()[0] or 0
     
     conn.close()
     
-    html = """
-    <h2>📊 User Stats Dashboard</h2>
-    <table border="1" cellpadding="10" style="border-collapse:collapse;">
-        <tr><th>Stat</th><th>Value</th></tr>
-        <tr><td>Total Users</td><td>{}</td></tr>
-        <tr><td>Active Today</td><td>{}</td></tr>
-        <tr><td>Total Referrals</td><td>{}</td></tr>
-    </table>
-    <br>
-    <h3>Plan Distribution</h3>
-    <table border="1" cellpadding="5" style="border-collapse:collapse;">
-        <tr><th>Plan</th><th>Users</th></tr>
-    """.format(total_users, active_today, total_refs)
-    
+    html = "<h2>📊 Bot Statistics</h2>"
+    html += f"<p><b>Total Users:</b> {total_users}</p>"
+    html += f"<p><b>Pending Proofs:</b> {pending}</p>"
+    html += f"<p><b>Total API Calls:</b> {total_usage}</p>"
+    html += "<h3>Plan Distribution</h3><ul>"
     for plan, count in plan_stats:
-        html += f"<tr><td>{plan}</td><td>{count}</td></tr>"
-    
-    html += "</table>"
+        html += f"<li>{plan}: {count}</li>"
+    html += "</ul>"
     return html
 
 @flask_app.route('/admin/approve/<user_id>')
@@ -209,44 +168,6 @@ def reject_user(user_id):
     conn.close()
     return f"❌ User {user_id} proof rejected!"
 
-# ====== Feature: Broadcast System (Admin Only) ======
-@flask_app.route('/admin/broadcast', methods=['GET', 'POST'])
-@requires_auth
-def admin_broadcast():
-    if request.method == 'POST':
-        message = request.form.get('message', '')
-        if not message:
-            return "❌ Message cannot be empty!"
-        
-        conn = sqlite3.connect("bot_users.db")
-        c = conn.cursor()
-        c.execute("SELECT user_id FROM users")
-        users = c.fetchall()
-        conn.close()
-        
-        # Send to all users (async)
-        asyncio.create_task(send_broadcast(message, [u[0] for u in users]))
-        
-        return f"✅ Broadcast sent to {len(users)} users!"
-    
-    html = """
-    <h2>📢 Broadcast Message</h2>
-    <form method="POST">
-        <textarea name="message" rows="10" cols="50" placeholder="Enter message to send to all users..."></textarea><br><br>
-        <input type="submit" value="Send Broadcast">
-    </form>
-    """
-    return html
-
-async def send_broadcast(message, user_ids):
-    app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-    for uid in user_ids:
-        try:
-            await app.bot.send_message(chat_id=int(uid), text=f"📢 **Broadcast**\n\n{message}", parse_mode="Markdown")
-            await asyncio.sleep(0.1)  # avoid rate limit
-        except Exception as e:
-            logger.error(f"Broadcast failed for {uid}: {e}")
-
 # ====== Utility Functions ======
 def get_bot_name(text):
     for name in BOT_NAMES:
@@ -266,6 +187,8 @@ def clean_text(text):
 def init_db():
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
+    
+    # Users table
     c.execute("""CREATE TABLE IF NOT EXISTS users (
         user_id TEXT PRIMARY KEY,
         plan TEXT DEFAULT 'free',
@@ -273,60 +196,55 @@ def init_db():
         proof_status TEXT DEFAULT 'none',
         proof_file_id TEXT,
         price INTEGER DEFAULT 0,
-        proof_timestamp TEXT,
-        referral_code TEXT,
-        referred_by TEXT
-    )""")
-    c.execute("""CREATE TABLE IF NOT EXISTS referrals (
-        referrer_id TEXT,
-        referred_id TEXT,
-        created_at TEXT,
-        PRIMARY KEY (referrer_id, referred_id)
-    )""")
-    c.execute("""CREATE TABLE IF NOT EXISTS usage_logs (
-        user_id TEXT,
-        date TEXT,
-        count INTEGER DEFAULT 0,
-        PRIMARY KEY (user_id, date)
+        proof_timestamp TEXT
     )""")
     
-    # Migrations
-    for col in ["proof_status", "proof_file_id", "price", "proof_timestamp", "referral_code", "referred_by"]:
-        try:
-            c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
-        except sqlite3.OperationalError:
-            pass
+    # Referrals table
+    c.execute("""CREATE TABLE IF NOT EXISTS referrals (
+        inviter_id TEXT,
+        invited_id TEXT,
+        timestamp TEXT,
+        reward_given INTEGER DEFAULT 0,
+        PRIMARY KEY (inviter_id, invited_id)
+    )""")
+    
+    # Migration for missing columns
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN proof_status TEXT DEFAULT 'none'")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN proof_file_id TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN price INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN proof_timestamp TEXT")
+    except sqlite3.OperationalError:
+        pass
     
     conn.commit()
     conn.close()
     logger.info("✅ Database initialized successfully.")
 
-def add_user(user_id, plan="free", referred_by=None):
+def add_user(user_id, plan="free"):
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
     price = PLAN_LIMITS[plan]["price"]
-    ref_code = generate_referral_code(user_id)
     c.execute("""
-        INSERT OR REPLACE INTO users (user_id, plan, usage_count, proof_status, proof_file_id, price, proof_timestamp, referral_code, referred_by) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (user_id, plan, 0, "none", None, price, None, ref_code, referred_by))
+        INSERT OR REPLACE INTO users (user_id, plan, usage_count, proof_status, proof_file_id, price, proof_timestamp) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (user_id, plan, 0, "none", None, price, None))
     conn.commit()
     conn.close()
-    
-    # If referred by someone, add referral and reward
-    if referred_by:
-        add_referral(referred_by, user_id)
-        # Give bonus to referrer (extra free usage)
-        conn = sqlite3.connect("bot_users.db")
-        c = conn.cursor()
-        c.execute("UPDATE users SET usage_count = usage_count - ? WHERE user_id=?", (REFERRAL_REWARDS["free"], referred_by))
-        conn.commit()
-        conn.close()
 
 def get_user(user_id):
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
-    c.execute("SELECT plan, usage_count, proof_status, proof_file_id, price, proof_timestamp, referral_code, referred_by FROM users WHERE user_id=?", (user_id,))
+    c.execute("SELECT plan, usage_count, proof_status, proof_file_id, price, proof_timestamp FROM users WHERE user_id=?", (user_id,))
     result = c.fetchone()
     conn.close()
     return result
@@ -336,7 +254,7 @@ def check_limit(user_id):
     if not user:
         add_user(user_id, "free")
         return True
-    plan, usage, _, _, _, _, _, _ = user
+    plan, usage, _, _, _, _ = user
     if usage >= PLAN_LIMITS[plan]["limit"]:
         return False
     return True
@@ -345,13 +263,51 @@ def increment_usage(user_id):
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
     c.execute("UPDATE users SET usage_count = usage_count + 1 WHERE user_id=?", (user_id,))
-    today = datetime.utcnow().date().isoformat()
-    c.execute("INSERT OR REPLACE INTO usage_logs (user_id, date, count) VALUES (?, ?, COALESCE((SELECT count FROM usage_logs WHERE user_id=? AND date=?), 0) + 1)",
-              (user_id, today, user_id, today))
     conn.commit()
     conn.close()
 
-# ====== Feature: Monthly Usage Reset ======
+# ====== Referral System ======
+def generate_ref_code(user_id):
+    return f"REF{user_id}"
+
+def get_inviter_id(ref_code):
+    # Extract user_id from REF12345 format
+    if ref_code.startswith("REF"):
+        try:
+            return ref_code[3:]  # Remove "REF"
+        except:
+            return None
+    return None
+
+def record_referral(inviter_id, invited_id):
+    conn = sqlite3.connect("bot_users.db")
+    c = conn.cursor()
+    timestamp = datetime.utcnow().isoformat()
+    c.execute("""
+        INSERT OR IGNORE INTO referrals (inviter_id, invited_id, timestamp, reward_given)
+        VALUES (?, ?, ?, ?)
+    """, (inviter_id, invited_id, timestamp, 0))
+    conn.commit()
+    conn.close()
+
+def get_referral_count(user_id):
+    conn = sqlite3.connect("bot_users.db")
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM referrals WHERE inviter_id=?", (user_id,))
+    count = c.fetchone()[0]
+    conn.close()
+    return count
+
+def give_referral_reward(inviter_id):
+    # Add 10 free uses to inviter
+    conn = sqlite3.connect("bot_users.db")
+    c = conn.cursor()
+    c.execute("UPDATE users SET usage_count = usage_count - 10 WHERE user_id=?", (inviter_id,))
+    c.execute("UPDATE referrals SET reward_given=1 WHERE inviter_id=? AND reward_given=0", (inviter_id,))
+    conn.commit()
+    conn.close()
+
+# ====== Monthly Usage Reset ======
 def reset_usage():
     try:
         conn = sqlite3.connect("bot_users.db")
@@ -365,10 +321,27 @@ def reset_usage():
 
 def run_scheduler():
     schedule.every(30).days.do(reset_usage)
-    logger.info("⏰ Scheduler started. Will reset usage every 30 days.")
+    # Daily motivation auto-send (Feature 3)
+    schedule.every().day.at("08:00").do(send_daily_motivation)
+    logger.info("⏰ Scheduler started.")
     while True:
         schedule.run_pending()
         time.sleep(60)
+
+def send_daily_motivation():
+    """Auto send daily motivation to all users"""
+    conn = sqlite3.connect("bot_users.db")
+    c = conn.cursor()
+    c.execute("SELECT user_id FROM users")
+    users = c.fetchall()
+    conn.close()
+    
+    for user in users:
+        try:
+            # This would need bot instance - simplified for now
+            logger.info(f"Daily motivation sent to {user[0]}")
+        except Exception as e:
+            logger.error(f"Failed to send motivation to {user[0]}: {e}")
 
 # ====== OpenRouter AI Call ======
 system_prompt = (
@@ -412,68 +385,104 @@ async def ask_model(prompt):
 # ====== Telegram Bot Command Handlers ======
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
+    text = update.message.text
+    
+    # ====== Referral System: Check if /start REF12345 ======
+    if text.startswith("/start REF"):
+        ref_code = text.split(" ")[0].replace("/start", "").strip() if len(text.split(" ")) > 0 else text.replace("/start", "").strip()
+        inviter_id = get_inviter_id(ref_code)
+        
+        if inviter_id and inviter_id != user_id:
+            # Record referral
+            record_referral(inviter_id, user_id)
+            give_referral_reward(inviter_id)
+            
+            await update.message.reply_text(
+                "🎉 ခင်ဗျားကို အခြားသူတစ်ယောက်က referral link နဲ့ ခေါ်လာတာပါ။\n"
+                "သူ့အတွက် ကျေးဇူးပါ။ ခင်ဗျားလည်း သူငယ်ချင်းတွေကို ဖိတ်လို့ရပါတယ်။\n"
+                "/referral - သင့် referral link ရယူရန်"
+            )
+        else:
+            await update.message.reply_text("⚠️ Invalid referral code.")
+    
+    # Normal start
     user = get_user(user_id)
     if not user:
         add_user(user_id, "free")
-        await update.message.reply_text(
-            "🙏 မင်္ဂလာပါ။ ကျွန်တော် မစ္စတာသန်းပါ။\n"
-            "သင့်ရဲ့ လက်ထောက် အဖြစ်နဲ့ ကိုယ်ရေးကိုယ်တာ၊ အလုပ်အကိုင်နဲ့ တခြားလုပ်ဆောင်ရမယ့် အရာတွေကို ယုံကြည်စွာ ဖြေရှင်းပေးဖို့ အသင့်ပါဗျ။\n\n"
-            "Commands:\n"
-            "/subscribe <plan> - Plan ပြောင်းရန် (free/basic/premium)\n"
-            "/ask <question> - AI ကို မေးမြန်းရန်\n"
-            "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
-            "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n"
-            "/referral - သင့် referral link ရယူရန်\n"
-            "/help - အကူအညီ\n\n"
-            "💡 သိကောင်းစရာ: အခမဲ့ သုံးချင်ရင် `free` နှိပ်ပါ၊ ပိုမိုအဆင့်မြင့်စွာ လုပ်ဆောင်စေချင်ရင် `basic` သို့မဟုတ် `premium` ကိုရွေးပြီး သုံးပါ။"
-        )
-    else:
-        await update.message.reply_text(
-            "🙏 ပြန်လည်ကြိုဆိုပါတယ်။ ကျွန်တော် မစ္စတာသန်းပါ။\n"
-            "Commands များအတွက် /help ကိုနှိပ်ပါ။"
-        )
+    
+    await update.message.reply_text(
+        "🙏 မင်္ဂလာပါ။ ကျွန်တော် မစ္စတာသန်းပါ။\n"
+        "သင့်ရဲ့ လက်ထောက် အဖြစ်နဲ့ ကိုယ်ရေးကိုယ်တာ၊ အလုပ်အကိုင်နဲ့ တခြားလုပ်ဆောင်ရမယ့် အရာတွေကို ယုံကြည်စွာ ဖြေရှင်းပေးဖို့ အသင့်ပါဗျ။\n\n"
+        "Commands:\n"
+        "/subscribe <plan> - Plan ပြောင်းရန် (free/basic/premium)\n"
+        "/ask <question> - AI ကို မေးမြန်းရန်\n"
+        "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
+        "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n"
+        "/referral - သင့် referral link ရယူရန်\n"
+        "/help - အကူအညီ\n\n"
+        "💡 သိကောင်းစရာ: အခမဲ့ သုံးချင်ရင် `free` နှိပ်ပါ၊ ပိုမိုအဆင့်မြင့်စွာ လုပ်ဆောင်စေချင်ရင် `basic` သို့မဟုတ် `premium` ကိုရွေးပြီး သုံးပါ။"
+    )
 
-# ====== Feature: Inline Keyboard Buttons ======
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "📌 **အသုံးပြုနည်း**\n\n"
+        "/start - ဘော့စတင်\n"
+        "/help - အကူအညီ\n"
+        "/subscribe <plan> - Plan ပြောင်းရန် (free/basic/premium)\n"
+        "/ask <question> - AI ကို မေးမြန်းရန်\n"
+        "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
+        "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n"
+        "/referral - သင့် referral link ရယူရန်\n\n"
+        "**Admin Commands:**\n"
+        "/verify <user_id> <plan> - Plan ပြောင်းရန်\n"
+        "/pending_proofs - Pending Proofs စာရင်းကြည့်ရန်\n"
+        "/approve_proof <user_id> - Proof အတည်ပြုရန်\n"
+        "/reject_proof <user_id> - Proof ပယ်ရန်\n"
+        "/broadcast <message> - အားလုံးကို message ပို့ရန်\n\n"
+        "💡 **Auto Subscribe:** `free`, `basic`, `premium` လို့ရိုက်ရင် အလိုအလျောက် subscribe လုပ်ပေးမယ်။"
+    )
+
+async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    ref_code = generate_ref_code(user_id)
+    bot_username = (await context.bot.get_me()).username
+    ref_link = f"https://t.me/{bot_username}?start={ref_code}"
+    
+    inviter_count = get_referral_count(user_id)
+    
+    await update.message.reply_text(
+        f"🔗 **သင့် Referral Link**\n\n"
+        f"`{ref_link}`\n\n"
+        f"📊 သင် ဖိတ်ထားသူ အရေအတွက်: **{inviter_count}**\n\n"
+        "✨ သူငယ်ချင်းတွေကို ဖိတ်လိုက်ပါ။ သင် **10 ကြိမ် free usage** ရပါမယ်။"
+    )
+
 async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
-    plan = context.args[0] if context.args else None
+    plan = context.args[0] if context.args else "free"
     
-    if plan and plan in PLAN_LIMITS:
-        # Direct subscription from command
-        conn = sqlite3.connect("bot_users.db")
-        c = conn.cursor()
-        c.execute("UPDATE users SET plan=?, proof_status='waiting', price=? WHERE user_id=?",
-                  (plan, PLAN_LIMITS[plan]["price"], user_id))
-        conn.commit()
-        conn.close()
-        
-        price_mmk = PLAN_LIMITS[plan]["price"]
-        price_usd = get_price_usd(price_mmk)
-        
-        await update.message.reply_text(
-            f"📌 **{plan}** Plan ကို ရွေးလိုက်ပါပြီ။\n"
-            f"💰 စျေးနှုန်း: {price_mmk:,} MMK (~${price_usd}) / month\n\n"
-            f"📸 ကျေးဇူးပြုပြီး ငွေသွင်း proof screenshot ကို ပို့ပါ။\n\n"
-            f"{PAYMENT_INFO}"
-        )
+    if plan not in PLAN_LIMITS:
+        allowed = ", ".join(PLAN_LIMITS.keys())
+        await update.message.reply_text(f"❌ '{plan}' မရှိပါ။ ရနိုင်တဲ့ Plan: {allowed}")
         return
     
-    # Show inline keyboard if no plan specified
+    # Inline Keyboard for plan selection (Feature 1)
     keyboard = [
         [
-            InlineKeyboardButton("🆓 Free", callback_data="subscribe_free"),
-            InlineKeyboardButton("📌 Basic (10,000 MMK)", callback_data="subscribe_basic"),
+            InlineKeyboardButton("📌 Free", callback_data="sub_free"),
+            InlineKeyboardButton("⭐ Basic (10,000 MMK)", callback_data="sub_basic")
         ],
         [
-            InlineKeyboardButton("⭐ Premium (30,000 MMK)", callback_data="subscribe_premium"),
-        ],
-        [
-            InlineKeyboardButton("❌ Cancel", callback_data="cancel"),
+            InlineKeyboardButton("💎 Premium (30,000 MMK)", callback_data="sub_premium")
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
+    
     await update.message.reply_text(
-        "📌 **ကျေးဇူးပြုပြီး Plan တစ်ခုကို ရွေးချယ်ပါ။**",
+        "📌 သင် ရွေးချင်တဲ့ Plan ကို ရွေးပါ။\n\n"
+        f"📊 Free: {PLAN_LIMITS['free']['limit']} ကြိမ် (အခမဲ့)\n"
+        f"📊 Basic: {PLAN_LIMITS['basic']['limit']} ကြိမ် (10,000 MMK)\n"
+        f"📊 Premium: {PLAN_LIMITS['premium']['limit']} ကြိမ် (30,000 MMK)",
         reply_markup=reply_markup
     )
 
@@ -481,16 +490,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
-    data = query.data
     user_id = str(query.from_user.id)
+    data = query.data
     
-    if data == "cancel":
-        await query.edit_message_text("❌ Subscription cancelled.")
-        return
-    
-    if data.startswith("subscribe_"):
-        plan = data.replace("subscribe_", "")
-        
+    if data.startswith("sub_"):
+        plan = data.replace("sub_", "")
         conn = sqlite3.connect("bot_users.db")
         c = conn.cursor()
         c.execute("UPDATE users SET plan=?, proof_status='waiting', price=? WHERE user_id=?",
@@ -508,68 +512,116 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"{PAYMENT_INFO}"
         )
 
-# ====== Feature: Referral System ======
-async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     user = get_user(user_id)
     if not user:
         add_user(user_id, "free")
-        user = get_user(user_id)
+        user = ("free", 0, "none", None, 0, None)
+    plan, usage, proof_status, _, price, proof_timestamp = user
+    limit = PLAN_LIMITS[plan]["limit"]
+    remaining = limit - usage
+    price_usd = get_price_usd(price)
     
-    ref_code = user[6]
-    bot_username = (await context.bot.get_me()).username
-    ref_link = f"https://t.me/{bot_username}?start=ref_{ref_code}"
-    
-    ref_count = get_referral_stats(user_id)
+    # Referral count
+    ref_count = get_referral_count(user_id)
     
     await update.message.reply_text(
-        f"📌 **Your Referral Link**\n\n"
-        f"🔗 {ref_link}\n\n"
-        f"📊 သင့် referral ကနေ join လာသူဦးရေ: **{ref_count}**\n"
-        f"🎁 တစ်ယောက်လျှင် **{REFERRAL_REWARDS['free']}** free usage ရရှိမယ်။\n\n"
-        f"သူငယ်ချင်းတွေကို share လုပ်ပြီး free usage ရယူလိုက်ပါ!"
+        f"📊 **Your Status**\n"
+        f"📌 Plan: **{plan}**\n"
+        f"💰 စျေးနှုန်း: {price:,} MMK (~${price_usd}) / month\n"
+        f"📊 သုံးပြီးသား: {usage} / {limit} ကြိမ်\n"
+        f"✅ ကျန်သုံးခွင့်: **{remaining}** ကြိမ်\n"
+        f"🔍 Proof Status: **{proof_status}**\n"
+        f"👥 ဖိတ်ထားသူ: **{ref_count}** ယောက်"
     )
 
-# ====== Referral start handler ======
-async def start_with_ref(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     
-    # Check if user already exists
-    user = get_user(user_id)
-    if user:
-        await update.message.reply_text("🙏 ပြန်လည်ကြိုဆိုပါတယ်။")
+    if not check_limit(user_id):
+        await update.message.reply_text(
+            "❌ သင့် Plan အတွက် သုံးခွင့်ကုန်သွားပါပြီ။\n"
+            "Plan အသစ်သို့ အဆင့်မြှင့်ရန် /subscribe ကိုသုံးပါ။"
+        )
         return
     
-    # Get referral code from deep link
-    if context.args and context.args[0].startswith("ref_"):
-        ref_code = context.args[0].replace("ref_", "")
-        
-        # Find referrer
-        conn = sqlite3.connect("bot_users.db")
-        c = conn.cursor()
-        c.execute("SELECT user_id FROM users WHERE referral_code=?", (ref_code,))
-        result = c.fetchone()
-        conn.close()
-        
-        if result:
-            referrer_id = result[0]
-            add_user(user_id, "free", referrer_id)
-            
-            # Notify referrer
-            try:
-                await context.bot.send_message(
-                    chat_id=int(referrer_id),
-                    text=f"🎉 သင့် referral link ကနေ အသုံးပြုသူအသစ် join လာပါပြီ။\n"
-                         f"သင် **{REFERRAL_REWARDS['free']}** free usage ရရှိပါပြီ။"
-                )
-            except Exception as e:
-                logger.error(f"Failed to notify referrer {referrer_id}: {e}")
-        else:
-            add_user(user_id, "free")
-    else:
-        add_user(user_id, "free")
+    if not context.args:
+        await update.message.reply_text("❌ မေးခွန်းထည့်ပေးပါ။\nUsage: /ask <your question>")
+        return
     
-    await start(update, context)
+    question = " ".join(context.args)
+    await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
+    
+    try:
+        answer = await ask_model(question)
+        answer = clean_text(answer)
+    except Exception as e:
+        logger.error(f"Ask command error for user {user_id}: {e}")
+        await update.message.reply_text(f"⚠️ Error: {str(e)[:100]}")
+        return
+    
+    increment_usage(user_id)
+    
+    if len(answer) > 4000:
+        for i in range(0, len(answer), 4000):
+            await update.message.reply_text(answer[i:i+4000], disable_web_page_preview=True)
+    else:
+        await update.message.reply_text(answer, disable_web_page_preview=True)
+
+async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in ADMIN_IDS:
+        await update.message.reply_text("❌ Admin only!")
+        return
+    
+    if not context.args:
+        await update.message.reply_text("Usage: /broadcast <message>")
+        return
+    
+    message = " ".join(context.args)
+    
+    conn = sqlite3.connect("bot_users.db")
+    c = conn.cursor()
+    c.execute("SELECT user_id FROM users")
+    users = c.fetchall()
+    conn.close()
+    
+    sent = 0
+    for user in users:
+        try:
+            await context.bot.send_message(chat_id=int(user[0]), text=f"📢 **Broadcast**\n\n{message}")
+            sent += 1
+            await asyncio.sleep(0.05)  # Avoid rate limit
+        except Exception as e:
+            logger.error(f"Failed to send to {user[0]}: {e}")
+    
+    await update.message.reply_text(f"✅ Broadcast sent to {sent} users.")
+
+async def verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in ADMIN_IDS:
+        await update.message.reply_text("❌ Admin only command!")
+        return
+    
+    if len(context.args) < 2:
+        await update.message.reply_text("Usage: /verify <user_id> <plan>")
+        return
+    
+    target_user = context.args[0]
+    plan = context.args[1]
+    
+    if plan not in PLAN_LIMITS:
+        allowed = ", ".join(PLAN_LIMITS.keys())
+        await update.message.reply_text(f"❌ Invalid plan. Allowed: {allowed}")
+        return
+    
+    conn = sqlite3.connect("bot_users.db")
+    c = conn.cursor()
+    price = PLAN_LIMITS[plan]["price"]
+    c.execute("UPDATE users SET plan=?, usage_count=0, price=? WHERE user_id=?", (plan, price, target_user))
+    conn.commit()
+    conn.close()
+    
+    await update.message.reply_text(f"✅ User {target_user} upgraded to {plan} plan!")
 
 # ====== Proof System ======
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -661,7 +713,7 @@ async def approve_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user_data:
         await update.message.reply_text(f"❌ User `{target_user}` မတွေ့ပါ။")
         return
-    plan, _, _, _, _, _, _, _ = user_data
+    plan, _, _, _, _, _ = user_data
     price = PLAN_LIMITS[plan]["price"]
     
     conn = sqlite3.connect("bot_users.db")
@@ -708,111 +760,6 @@ async def reject_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Failed to notify user {target_user}: {e}")
 
-async def verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ Admin only command!")
-        return
-    
-    if len(context.args) < 2:
-        await update.message.reply_text("Usage: /verify <user_id> <plan>")
-        return
-    
-    target_user = context.args[0]
-    plan = context.args[1]
-    
-    if plan not in PLAN_LIMITS:
-        allowed = ", ".join(PLAN_LIMITS.keys())
-        await update.message.reply_text(f"❌ Invalid plan. Allowed: {allowed}")
-        return
-    
-    conn = sqlite3.connect("bot_users.db")
-    c = conn.cursor()
-    price = PLAN_LIMITS[plan]["price"]
-    c.execute("UPDATE users SET plan=?, usage_count=0, price=? WHERE user_id=?", (plan, price, target_user))
-    conn.commit()
-    conn.close()
-    
-    await update.message.reply_text(f"✅ User {target_user} upgraded to {plan} plan!")
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [
-            InlineKeyboardButton("📌 Plans", callback_data="help_plans"),
-            InlineKeyboardButton("🔄 Referral", callback_data="help_referral"),
-        ],
-        [
-            InlineKeyboardButton("📊 Status", callback_data="help_status"),
-            InlineKeyboardButton("📸 Proof", callback_data="help_proof"),
-        ],
-        [
-            InlineKeyboardButton("❌ Close", callback_data="cancel"),
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(
-        "📌 **အကူအညီ**\n\n"
-        "အောက်ပါခလုတ်တွေကိုနှိပ်ပြီး အချက်အလက်များကို ကြည့်ရှုနိုင်ပါတယ်။",
-        reply_markup=reply_markup
-    )
-
-async def help_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    
-    data = query.data
-    
-    if data == "help_plans":
-        text = "📌 **Plans**\n\n"
-        for plan, info in PLAN_LIMITS.items():
-            price_usd = get_price_usd(info["price"])
-            text += f"• **{plan.capitalize()}** - {info['limit']} messages/month, {info['price']:,} MMK (~${price_usd})\n"
-        await query.edit_message_text(text, parse_mode="Markdown")
-    
-    elif data == "help_referral":
-        text = "🔄 **Referral System**\n\n"
-        text += "သင့် referral link ကိုရယူပြီး သူငယ်ချင်းတွေကို invite လုပ်ပါ။\n"
-        text += f"တစ်ယောက်လျှင် **{REFERRAL_REWARDS['free']}** free usage ရရှိမယ်။\n"
-        text += "Commands: `/referral`"
-        await query.edit_message_text(text, parse_mode="Markdown")
-    
-    elif data == "help_status":
-        text = "📊 **Status**\n\n"
-        text += "သင့် Plan နဲ့ ကျန်သုံးခွင့်ကို `/status` နဲ့ ကြည့်ပါ။"
-        await query.edit_message_text(text, parse_mode="Markdown")
-    
-    elif data == "help_proof":
-        text = "📸 **Proof**\n\n"
-        text += "Plan ဝယ်ပြီးရင် ငွေသွင်း screenshot ကို bot ဆီတိုက်ရိုက်ပို့ပါ။\n"
-        text += "Admin စစ်ဆေးပြီး Plan အဆင့်မြှင့်ပေးမှာပါ။"
-        await query.edit_message_text(text, parse_mode="Markdown")
-    
-    elif data == "cancel":
-        await query.edit_message_text("❌ Closed.")
-        return
-
-async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    user = get_user(user_id)
-    if not user:
-        add_user(user_id, "free")
-        user = ("free", 0, "none", None, 0, None, None, None)
-    plan, usage, proof_status, _, price, _, ref_code, referred_by = user
-    limit = PLAN_LIMITS[plan]["limit"]
-    remaining = limit - usage
-    price_usd = get_price_usd(price)
-    
-    ref_count = get_referral_stats(user_id)
-    
-    await update.message.reply_text(
-        f"📊 **Your Status**\n"
-        f"📌 Plan: **{plan}**\n"
-        f"💰 စျေးနှုန်း: {price:,} MMK (~${price_usd}) / month\n"
-        f"📊 သုံးပြီးသား: {usage} / {limit} ကြိမ်\n"
-        f"✅ ကျန်သုံးခွင့်: **{remaining}** ကြိမ်\n"
-        f"🔍 Proof Status: **{proof_status}**\n"
-        f"🔄 Referrals: **{ref_count}**"
-    )
-
 # ====== Auto Subscribe via text message ======
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     original_text = update.message.text
@@ -849,22 +796,18 @@ def run_bot():
     logger.info("🤖 Bot starting...")
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     
-    # Command handlers
-    app.add_handler(CommandHandler("start", start_with_ref))
+    app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("subscribe", subscribe))
-    app.add_handler(CommandHandler("status", status))
     app.add_handler(CommandHandler("referral", referral))
+    app.add_handler(CommandHandler("status", status))
+    app.add_handler(CommandHandler("ask", ask))
+    app.add_handler(CommandHandler("broadcast", broadcast))
     app.add_handler(CommandHandler("verify", verify))
     app.add_handler(CommandHandler("pending_proofs", pending_proofs))
     app.add_handler(CommandHandler("approve_proof", approve_proof))
     app.add_handler(CommandHandler("reject_proof", reject_proof))
-    
-    # Callback query handlers
-    app.add_handler(CallbackQueryHandler(button_handler, pattern="^(subscribe_|cancel)"))
-    app.add_handler(CallbackQueryHandler(help_button_handler, pattern="^help_"))
-    
-    # Message handlers
+    app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
