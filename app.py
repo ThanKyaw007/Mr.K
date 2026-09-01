@@ -238,16 +238,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         add_user(user_id, "free")
     await update.message.reply_text(
         "🙏 မင်္ဂလာပါ။ ကျွန်တော် မစ္စတာသန်းပါ။\n"
-        "သင့်ရဲ့ လက်ထောက် အဖြစ်နဲ့ ကိုယ်ရေးကိုယ်တာ၊ အလုပ်အကိုင် စတာတွေကို ယုံကြည်စွာ တိုင်ပင် ဖြေရှင်းပေးဖို့ အသင့်ပါ။\n\n"
+        "သင့်ရဲ့ လက်ထောက် အဖြစ်နဲ့ ကိုယ်ရေးကိုယ်တာ၊ အလုပ်အကိုင်နဲ့ တခြားလုပ်ဆောင်ရမယ့် အရာတွေကို ယုံကြည်စွာ ဖြေရှင်းပေးဖို့ အသင့်ပါဗျ။\n\n"
         "Commands:\n"
         "/subscribe <plan> - Plan ပြောင်းရန် (free/basic/premium)\n"
         "/ask <question> - AI ကို မေးမြန်းရန်\n"
         "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
         "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n"
         "/help - အကူအညီ\n\n"
-        "💡 သိကောင်းစရာ: `free`, `basic`, `premium` လို့ရိုက်ရင် အလိုအလျောက် subscribe လုပ်ပေးမယ်။"
+        "💡 သိကောင်းစရာ: `free`, `basic`, `premium` လို့ရိုက်ရင် အလိုအလျောက် subscribe လုပ်ပေးမယ်။\n"
+        "အခမဲ့ သုံးချင်ရင် `free` နှိပ်ပါ၊ ပိုမိုအဆင့်မြင့်စွာ လုပ်ဆောင်စေချင်ရင် `basic` သို့မဟုတ် `premium` ကိုရွေးပြီး သုံးပါ။"
     )
-
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "📌 **အသုံးပြုနည်း**\n\n"
