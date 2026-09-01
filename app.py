@@ -177,6 +177,16 @@ def admin_stats():
     html += "</ul>"
     return html
 
+from flask import send_file
+
+@flask_app.route("/download_db")
+@requires_auth
+def download_db():
+    try:
+        return send_file("bot_users.db", as_attachment=True)
+    except Exception as e:
+        return f"Error: {e}"
+
 @flask_app.route("/admin/approve/<user_id>")
 @requires_auth
 def approve_user(user_id):
