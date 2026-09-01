@@ -71,49 +71,23 @@ BOT_NAMES = ["မစ္စတာသန်း", "ကိုသန်း", "သန�
 # ====== Flask App ======
 flask_app = Flask(__name__)
 
-
-# ====== NEW: Flask Auth (Username + Password) ======
-def check_auth(username, password):
-    return username in ADMIN_USERS and ADMIN_USERS[username] == password
-
-
-def authenticate():
-    return Response(
-        "❌ Unauthorized! Username and Password required.",
-        401,
-        {"WWW-Authenticate": 'Basic realm="Login Required"'},
-    )
-
-
-def requires_auth(f):
-    @functools.wraps(f)
-    def decorated(*args, **kwargs):
-        auth = request.authorization
-        if not auth or not check_auth(auth.username, auth.password):
-            return authenticate()
-        return f(*args, **kwargs)
-
-    return decorated
-
+# ====== Flask Routes (ဒီနေရာမှာ စတင်ထည့်ပါ) ======
 
 @flask_app.route("/")
 def home():
     return "🤖 Bot is running! Visit /admin/proofs for dashboard."
 
-
 @flask_app.route("/health")
 def health():
     return "OK", 200
 
-
+# 👇 ဒီနေရာမှာ /admin/proofs ကို ထည့်ပါ
 @flask_app.route("/admin/proofs")
 @requires_auth
 def admin_proofs():
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
-    c.execute(
-        "SELECT user_id, plan, usage_count, proof_status, proof_file_id FROM users"
-    )
+    c.execute("SELECT user_id, plan, usage_count, proof_status, proof_file_id FROM users")
     results = c.fetchall()
     conn.close()
 
@@ -136,6 +110,18 @@ def admin_proofs():
     html += "</table>"
     return html
 
+# 👇 နောက်ထပ် Route တွေကို ဆက်ထည့်ပါ
+@flask_app.route("/admin/users")
+@requires_auth
+def admin_users():
+    # ...
+
+@flask_app.route("/admin/stats")
+@requires_auth
+def admin_stats():
+    # ...
+
+# ====== ဒီမှာ Flask Routes ပြီးဆုံးပါပြီ ======
 
 # ====== NEW: User List Dashboard ======
 @flask_app.route("/admin/users")
