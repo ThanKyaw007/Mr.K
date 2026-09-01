@@ -590,9 +590,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         add_user(user_id, "free")
 
     await update.message.reply_text(
-        "🙏 မင်္ဂလာပါ။ ကျွန်တော် မစ္စတာသန်းပါ။\n"
-        "သင့်ရဲ့ လက်ထောက် အဖြစ်နဲ့ ကိုယ်ရေးကိုယ်တာ၊ အလုပ်အကိုင်နဲ့ "
-        "တခြားလုပ်ဆောင်ရမယ့် အရာတွေကို ယုံကြည်စွာ ဖြေရှင်းပေးဖို့ အသင့်ပါဗျ။\n\n"
+        "🙏 မင်္ဂလာပါ\n"
+        "ကျွန်တော် မစ္စတာသန်းပါ။\n"
+        "သင့်ရဲ့ လက်ထောက် အဖြစ်နဲ့ ကိုယ်ရေးကိုယ်တာ၊\n"
+        "အလုပ်အကိုင်နဲ့ တခြားလုပ်ဆောင်ရမယ့် အရာတွေကို\n"
+        "ယုံကြည်စွာနဲ့ ကူညီဖြေရှင်းပေးဖို့ အသင့်ပါဗျ။\n\n"
         "Commands:\n"
         "/subscribe <plan> - Plan ပြောင်းရန် (free/basic/premium/premium_plus)\n"
         "/ask <question> - AI ကို မေးမြန်းရန်\n"
@@ -603,7 +605,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/habit <habit> - Habit ထည့်ရန်\n"
         "/myhabits - သင့် habits စာရင်းကြည့်ရန်\n"
         "/help - အကူအညီ\n\n"
-        "💡 သိကောင်းစရာ: အခမဲ့ သုံးချင်ရင် `free` နှိပ်ပါ။"
+        "💡 သိကောင်းစရာ: အခမဲ့ သုံးချင်ရင် `/subscribe free` နှိပ်ပါ။"
     )
 
 
