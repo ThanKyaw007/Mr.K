@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import sqlite3
 import threading
 import asyncio
@@ -156,14 +157,38 @@ def admin_stats():
     total_usage = c.fetchone()[0] or 0
     conn.close()
 
-    html = "<h2>📊 Bot Statistics</h2>"
-    html += f"<p><b>Total Users:</b> {total_users}</p>"
-    html += f"<p><b>Pending Proofs:</b> {pending}</p>"
-    html += f"<p><b>Total API Calls:</b> {total_usage}</p>"
-    html += "<h3>Plan Distribution</h3><ul>"
-    for plan, count in plan_stats:
-        html += f"<li>{plan}: {count}</li>"
-    html += "</ul>"
+    plan_names = [row[0] for row in plan_stats]
+    plan_counts = [row[1] for row in plan_stats]
+
+    html = f"""
+    <h2>📊 Bot Statistics</h2>
+    <p><b>Total Users:</b> {total_users}</p>
+    <p><b>Pending Proofs:</b> {pending}</p>
+    <p><b>Total API Calls:</b> {total_usage}</p>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <div style="width: 500px; height: 350px; margin: 20px auto;">
+        <canvas id="planChart"></canvas>
+    </div>
+
+    <script>
+        const ctx = document.getElementById('planChart').getContext('2d');
+        const chart = new Chart(ctx, {{
+            type: 'bar',
+            data: {{
+                labels: {json.dumps(plan_names)},
+                datasets: [{{
+                    label: 'အသုံးပြုသူ အရေအတွက်',
+                    data: {json.dumps(plan_counts)},
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                }}]
+            }},
+            options: {{ scales: {{ y: {{ beginAtZero: true }} }} }}
+        }});
+    </script>
+    """
     return html
 
 @flask_app.route("/download_db")
@@ -589,36 +614,58 @@ async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     plan = context.args[0] if context.args else "free"
+
     if plan not in PLAN_LIMITS:
         allowed = ", ".join(PLAN_LIMITS.keys())
         await update.message.reply_text(f"❌ '{plan}' မရှိပါ။ ရနိုင်တဲ့ Plan: {allowed}")
         return
+
+    # ✅ ဒီနေရာမှာ ကြိမ်အရေအတွက်တွေ ဖြုတ်ပြီး Plan နဲ့ ဈေးနှုန်းကိုပဲ ပြထားပါတယ်
     keyboard = [
         [InlineKeyboardButton("📌 Free (အခမဲ့)", callback_data="sub_free")],
         [InlineKeyboardButton("⭐ Basic (10,000 MMK)", callback_data="sub_basic")],
         [InlineKeyboardButton("💎 Premium (30,000 MMK)", callback_data="sub_premium")],
         [InlineKeyboardButton("👑 Premium+ (50,000 MMK)", callback_data="sub_premium_plus")],
     ]
-    await update.message.reply_text("📌 ရွေးချင်တဲ့ Plan ကို ရွေးပါ။", reply_markup=InlineKeyboardMarkup(keyboard))
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        "📌 အောက်ပါ Plan များမှ ရွေးချယ်ပါ။\n\n"
+        "📌 Free (အခမဲ့)\n"
+        "⭐ Basic (10,000 MMK)\n"
+        "💎 Premium (30,000 MMK)\n"
+        "👑 Premium+ (50,000 MMK) (VIP)",
+        reply_markup=reply_markup,
+    )
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = str(query.from_user.id)
     data = query.data
+
     if data.startswith("sub_"):
         plan = data.replace("sub_", "")
         if plan not in PLAN_LIMITS:
             await query.edit_message_text("❌ Invalid plan.")
             return
+
         conn = sqlite3.connect("bot_users.db")
         c = conn.cursor()
         c.execute("UPDATE users SET plan=?, proof_status='waiting', price=? WHERE user_id=?", (plan, PLAN_LIMITS[plan]["price"], user_id))
         conn.commit()
         conn.close()
+
         price_mmk = PLAN_LIMITS[plan]["price"]
         price_usd = get_price_usd(price_mmk)
-        text = f"📌 **{plan}** Plan ကို ရွေးလိုက်ပါပြီ။\n💰 စျေးနှုန်း: {price_mmk:,} MMK (~${price_usd}) / month\n📸 ငွေသွင်း proof screenshot ကို ပို့ပါ။\n\n{PAYMENT_INFO}"
+
+        # ✅ ဒီမှာလည်း ကြိမ်အရေအတွက် မပါအောင် ဖြုတ်ပြီး ဈေးနှုန်းကိုပဲ ပြထားပါတယ်
+        text = (
+            f"📌 **{plan}** Plan ကို ရွေးလိုက်ပါပြီ။\n"
+            f"💰 စျေးနှုန်း: {price_mmk:,} MMK (~${price_usd}) / month\n\n"
+            f"📸 ကျေးဇူးပြုပြီး ငွေသွင်း proof screenshot ကို ပို့ပါ။\n\n"
+            f"{PAYMENT_INFO}"
+        )
         await query.edit_message_text(text)
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -645,18 +692,32 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
+    chat_type = update.effective_chat.type
+    
+    # Group ထဲမှာ သုံးရင် ညွှန်ကြားချက် ပြန်ပေး (Privacy & Cost သက်သာစေရန်)
+    if chat_type in ["group", "supergroup"]:
+        await update.message.reply_text(
+            "⚠️ /ask command ကို Group ထဲမှာ တိုက်ရိုက်မသုံးပါနဲ့ဗျာ။\n"
+            "🔒 ကိုယ်ရေးကိုယ်တာ မေးခွန်းတွေအတွက် Bot ရဲ့ Private Chat (DM) မှာ အသုံးပြုပေးပါ။\n"
+            "ဒါမှမဟုတ် Group ထဲမှာ ကျွန်တော့်နာမည် ဒါမှမဟုတ် @BotUsername ကို ခေါ်ပြီး မေးနိုင်ပါတယ်။"
+        )
+        return
+
     if not check_limit(user_id):
         await update.message.reply_text("❌ သုံးခွင့်ကုန်သွားပါပြီ။ Plan အသစ်ရွေးပါ။")
         return
+
     if not context.args:
         await update.message.reply_text("❌ မေးခွန်းထည့်ပေးပါ။\nUsage: /ask <your question>")
         return
+
     question = " ".join(context.args)
     local_answer = get_local_response(question)
     if local_answer:
         increment_usage(user_id)
         await update.message.reply_text(local_answer)
         return
+
     await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
     try:
         answer = await ask_model(question, user_id)
