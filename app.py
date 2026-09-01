@@ -32,13 +32,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ====== Configuration ======
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or "YOUR_TELEGRAM_TOKEN_HERE"
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY") or "YOUR_OPENROUTER_KEY_HERE"
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or "8617869426:AAHzomx_Uikd_S69UxCGAp4avOWUx6ytqVM"
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY") or "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"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 ADMIN_IDS = [1119128553]  # @Thawkhyan999
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "mysecret123")
-DAILY_COACHING_TIME = os.environ.get("DAILY_COACHING_TIME", "08:00")
 
 EXCHANGE_RATE = 4545
 
@@ -60,7 +59,7 @@ def get_price_usd(price_mmk):
     return round(price_mmk / EXCHANGE_RATE, 2)
 
 
-BOT_NAMES = ["မစ္စတာသန်း"]
+BOT_NAMES = ["မစ္စတာသန်း", "ကိုသန်း", "သန်း"]
 
 # ====== Flask App ======
 flask_app = Flask(__name__)
@@ -564,14 +563,35 @@ async def send_daily_coaching(bot):
 # ====== Scheduler ======
 def run_scheduler(bot):
     schedule.every(30).days.do(reset_usage)
-    schedule.every().day.at(DAILY_COACHING_TIME).do(lambda: asyncio.run(send_daily_coaching(bot)))
+    schedule.every().day.at("08:00").do(lambda: asyncio.run(send_daily_coaching(bot)))
     logger.info(
-        f"⏰ Scheduler started. Reset usage every 30 days, daily coaching at {DAILY_COACHING_TIME}."
+        "⏰ Scheduler started. Reset usage every 30 days, daily coaching at 8:00 AM."
     )
 
     while True:
         schedule.run_pending()
         time.sleep(60)
+
+
+# ====== Check if bot is mentioned in group chat ======
+async def is_bot_mentioned(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Check if the bot is mentioned by name in a group chat"""
+    if not update.message or not update.message.text:
+        return False
+    
+    text = update.message.text.lower()
+    
+    # Check if any bot name is in the text
+    for name in BOT_NAMES:
+        if name.lower() in text:
+            return True
+    
+    # Also check if bot username is mentioned with @
+    bot_username = (await context.bot.get_me()).username
+    if bot_username and f"@{bot_username.lower()}" in text:
+        return True
+    
+    return False
 
 
 # ====== Telegram Bot Command Handlers ======
@@ -590,11 +610,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         add_user(user_id, "free")
 
     await update.message.reply_text(
-        "🙏 မင်္ဂလာပါ\n"
-        "ကျွန်တော် မစ္စတာသန်းပါ။\n"
-        "သင့်ရဲ့ လက်ထောက် အဖြစ်နဲ့ ကိုယ်ရေးကိုယ်တာ၊\n"
-        "အလုပ်အကိုင်နဲ့ တခြားလုပ်ဆောင်ရမယ့် အရာတွေကို\n"
-        "ယုံကြည်စွာနဲ့ ကူညီဖြေရှင်းပေးဖို့ အသင့်ပါဗျ။\n\n"
+        "🙏 မင်္ဂလာပါ။ ကျွန်တော် မစ္စတာသန်းပါ။\n"
+        "သင့်ရဲ့ လက်ထောက် အဖြစ်နဲ့ ကိုယ်ရေးကိုယ်တာ၊ အလုပ်အကိုင်နဲ့ "
+        "တခြားလုပ်ဆောင်ရမယ့် အရာတွေကို ယုံကြည်စွာ ဖြေရှင်းပေးဖို့ အသင့်ပါဗျ။\n\n"
         "Commands:\n"
         "/subscribe <plan> - Plan ပြောင်းရန် (free/basic/premium/premium_plus)\n"
         "/ask <question> - AI ကို မေးမြန်းရန်\n"
@@ -885,7 +903,7 @@ async def myhabits(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text)
 
 
-# ====== Proof System (Updated with Admin Notification) ======
+# ====== Proof (photo upload) ======
 async def proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "📸 ငွေသွင်း proof screenshot ကို ဒီ chat ထဲမှာ Photo အနေနဲ့ ပို့ပေးပါ။"
@@ -905,24 +923,11 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Admin က စစ်ဆေးပြီး approve/reject လုပ်ပေးပါမယ်။"
     )
 
-    # Notify Admin
-    for admin_id in ADMIN_IDS:
-        try:
-            await context.bot.send_photo(
-                chat_id=admin_id,
-                photo=file_id,
-                caption=f"📋 Proof from User {user_id}\n"
-                        f"Approve: /approve_proof {user_id}\n"
-                        f"Reject: /reject_proof {user_id}"
-            )
-        except Exception as e:
-            logger.error(f"Admin notify error: {e}")
-
 
 # ====== Admin Commands ======
 async def verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if user_id not in ADMIN_IDS:
+    user_id = str(update.effective_user.id)
+    if user_id not in [str(a) for a in ADMIN_IDS]:
         await update.message.reply_text("❌ Admin only.")
         return
 
@@ -951,8 +956,8 @@ async def verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def pending_proofs(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if user_id not in ADMIN_IDS:
+    user_id = str(update.effective_user.id)
+    if user_id not in [str(a) for a in ADMIN_IDS]:
         await update.message.reply_text("❌ Admin only.")
         return
 
@@ -970,13 +975,13 @@ async def pending_proofs(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = "📋 **Pending Proofs**\n"
     for uid, plan, file_id, ts in rows:
-        text += f"\n• User: {uid} | Plan: {plan} | Time: {ts}"
+        text += f"\n• User: {uid} | Plan: {plan} | File: {file_id} | Time: {ts}"
     await update.message.reply_text(text)
 
 
 async def approve_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if user_id not in ADMIN_IDS:
+    user_id = str(update.effective_user.id)
+    if user_id not in [str(a) for a in ADMIN_IDS]:
         await update.message.reply_text("❌ Admin only.")
         return
 
@@ -1009,8 +1014,8 @@ async def approve_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def reject_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if user_id not in ADMIN_IDS:
+    user_id = str(update.effective_user.id)
+    if user_id not in [str(a) for a in ADMIN_IDS]:
         await update.message.reply_text("❌ Admin only.")
         return
 
@@ -1032,8 +1037,8 @@ async def reject_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if user_id not in ADMIN_IDS:
+    user_id = str(update.effective_user.id)
+    if user_id not in [str(a) for a in ADMIN_IDS]:
         await update.message.reply_text("❌ Admin only.")
         return
 
@@ -1059,6 +1064,87 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(f"Broadcast failed to {uid}: {e}")
 
     await update.message.reply_text(f"✅ Broadcast sent to {sent} users.")
+
+
+# ====== Main Message Handler with Group Chat Name Mention ======
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Only handle text messages
+    if not update.message or not update.message.text:
+        return
+    
+    user_id = str(update.effective_user.id)
+    chat_type = update.effective_chat.type
+    text = update.message.text
+    
+    # ====== Auto Subscribe: free/basic/premium/premium_plus ======
+    if text.lower() in ["free", "basic", "premium", "premium_plus"]:
+        context.args = [text.lower()]
+        await subscribe(update, context)
+        return
+    
+    # ====== Group Chat: Check if bot is mentioned ======
+    if chat_type in ["group", "supergroup"]:
+        # Check if bot is mentioned by name (ကိုသန်း) or username (@BotUsername)
+        if await is_bot_mentioned(update, context):
+            # Remove the bot name from the question
+            for name in BOT_NAMES:
+                if name.lower() in text.lower():
+                    text = re.sub(name, "", text, flags=re.IGNORECASE)
+            
+            # Also remove @username if present
+            bot_username = (await context.bot.get_me()).username
+            if bot_username:
+                text = re.sub(f"@{bot_username}", "", text, flags=re.IGNORECASE)
+            
+            text = text.strip()
+            
+            # If there's no question after removing bot name, ignore
+            if not text:
+                return
+            
+            # Check limit and respond
+            if not check_limit(user_id):
+                await update.message.reply_text(
+                    "❌ သုံးခွင့်ကုန်သွားပါပြီ။ Plan အသစ်ရွေးပါ။"
+                )
+                return
+            
+            await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
+            try:
+                answer = await ask_model(text)
+                answer = clean_text(answer)
+            except Exception as e:
+                logger.error(f"Group message error for user {user_id}: {e}")
+                await update.message.reply_text(f"⚠️ Error: {str(e)[:100]}")
+                return
+            
+            increment_usage(user_id)
+            await update.message.reply_text(answer, disable_web_page_preview=True)
+            return
+    
+    # ====== Private Chat: Normal message handling ======
+    if chat_type == "private":
+        if not check_limit(user_id):
+            await update.message.reply_text(
+                "❌ သုံးခွင့်ကုန်သွားပါပြီ။ Plan အသစ်ရွေးပါ။"
+            )
+            return
+        
+        await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
+        try:
+            answer = await ask_model(text)
+            answer = clean_text(answer)
+        except Exception as e:
+            logger.error(f"Handle message error for user {user_id}: {e}")
+            await update.message.reply_text(f"⚠️ Error: {str(e)[:100]}")
+            return
+        
+        increment_usage(user_id)
+        bot_name = get_bot_name(text)
+        if bot_name:
+            answer = f"{bot_name} ပြောတယ်... {answer}"
+        
+        await update.message.reply_text(answer, disable_web_page_preview=True)
 
 
 # ====== Main ======
@@ -1094,10 +1180,14 @@ def main():
         MessageHandler(filters.PHOTO & (~filters.COMMAND), photo_handler)
     )
 
+    # Message handler (for private chats and group mentions)
+    application.add_handler(
+        MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message)
+    )
+
     # Run Flask + Scheduler in threads
     def run_flask():
-        port = int(os.environ.get("PORT", 5000))
-        flask_app.run(host="0.0.0.0", port=port)
+        flask_app.run(host="0.0.0.0", port=5000)
 
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
