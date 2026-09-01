@@ -37,12 +37,12 @@ EXCHANGE_RATE = 4545
 
 PAYMENT_INFO = "💳 **ငွေလွှဲရန်**\nKBZPay: 09426419462\nWavePay: 09426419462"
 
-# ====== Plan Limits (Premium Plus added) ======
+# ====== Plan Limits (with Premium Plus) ======
 PLAN_LIMITS = {
     "free": {"limit": 50, "price": 0},
     "basic": {"limit": 500, "price": 10000},
     "premium": {"limit": 1500, "price": 30000},
-    "premium_plus": {"limit": 5000, "price": 50000}  # VIP Coaching Plan
+    "premium_plus": {"limit": 5000, "price": 50000}  # NEW
 }
 
 def get_price_usd(price_mmk):
@@ -186,6 +186,7 @@ def init_db():
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
     
+    # Users table (with profile columns)
     c.execute("""CREATE TABLE IF NOT EXISTS users (
         user_id TEXT PRIMARY KEY,
         plan TEXT DEFAULT 'free',
@@ -193,9 +194,16 @@ def init_db():
         proof_status TEXT DEFAULT 'none',
         proof_file_id TEXT,
         price INTEGER DEFAULT 0,
-        proof_timestamp TEXT
+        proof_timestamp TEXT,
+        goals TEXT,
+        weaknesses TEXT,
+        dream TEXT,
+        career TEXT,
+        money_mindset TEXT,
+        relationship TEXT
     )""")
     
+    # Referrals table
     c.execute("""
     CREATE TABLE IF NOT EXISTS referrals (
         inviter_id TEXT,
@@ -204,6 +212,16 @@ def init_db():
     )
     """)
     
+    # Habits table
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS habits (
+        user_id TEXT,
+        habit TEXT,
+        created_at TEXT
+    )
+    """)
+    
+    # Migration for new columns
     try:
         c.execute("ALTER TABLE users ADD COLUMN proof_status TEXT DEFAULT 'none'")
     except sqlite3.OperationalError:
@@ -218,6 +236,30 @@ def init_db():
         pass
     try:
         c.execute("ALTER TABLE users ADD COLUMN proof_timestamp TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN goals TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN weaknesses TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN dream TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN career TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN money_mindset TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN relationship TEXT")
     except sqlite3.OperationalError:
         pass
     
@@ -239,7 +281,7 @@ def add_user(user_id, plan="free"):
 def get_user(user_id):
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
-    c.execute("SELECT plan, usage_count, proof_status, proof_file_id, price, proof_timestamp FROM users WHERE user_id=?", (user_id,))
+    c.execute("SELECT plan, usage_count, proof_status, proof_file_id, price, proof_timestamp, goals, weaknesses, dream, career, money_mindset, relationship FROM users WHERE user_id=?", (user_id,))
     result = c.fetchone()
     conn.close()
     return result
@@ -249,7 +291,7 @@ def check_limit(user_id):
     if not user:
         add_user(user_id, "free")
         return True
-    plan, usage, _, _, _, _ = user
+    plan, usage, _, _, _, _, _, _, _, _, _, _ = user
     if usage >= PLAN_LIMITS[plan]["limit"]:
         return False
     return True
@@ -270,10 +312,11 @@ def give_referral_reward(inviter_id, invited_id):
         conn = sqlite3.connect("bot_users.db")
         c = conn.cursor()
         
-        c.execute("UPDATE users SET usage_count = usage_count - 20 WHERE user_id=?", (inviter_id,))
+        # 50 calls free usage
+        c.execute("UPDATE users SET usage_count = usage_count - 50 WHERE user_id=?", (inviter_id,))
         if c.rowcount == 0:
             add_user(inviter_id, "free")
-            c.execute("UPDATE users SET usage_count = usage_count - 20 WHERE user_id=?", (inviter_id,))
+            c.execute("UPDATE users SET usage_count = usage_count - 50 WHERE user_id=?", (inviter_id,))
         
         c.execute("""
             INSERT INTO referrals (inviter_id, invited_id, timestamp)
@@ -282,7 +325,7 @@ def give_referral_reward(inviter_id, invited_id):
         
         conn.commit()
         conn.close()
-        logger.info(f"🎁 Referral reward: inviter={inviter_id}, invited={invited_id}")
+        logger.info(f"🎁 Referral reward (50 calls): inviter={inviter_id}, invited={invited_id}")
     except Exception as e:
         logger.error(f"❌ Referral reward error: {e}")
 
@@ -293,6 +336,41 @@ def get_referral_count(user_id):
     count = c.fetchone()[0]
     conn.close()
     return count
+
+def get_referral_weekly_count(user_id):
+    """Get referrals in the last 7 days"""
+    conn = sqlite3.connect("bot_users.db")
+    c = conn.cursor()
+    week_ago = (datetime.utcnow() - timedelta(days=7)).isoformat()
+    c.execute("SELECT COUNT(*) FROM referrals WHERE inviter_id=? AND timestamp>=?", (user_id, week_ago))
+    count = c.fetchone()[0]
+    conn.close()
+    return count
+
+# ====== Profile Functions ======
+def update_profile(user_id, field, value):
+    conn = sqlite3.connect("bot_users.db")
+    c = conn.cursor()
+    c.execute(f"UPDATE users SET {field}=? WHERE user_id=?", (value, user_id))
+    conn.commit()
+    conn.close()
+
+# ====== Habit Functions ======
+def add_habit(user_id, habit):
+    conn = sqlite3.connect("bot_users.db")
+    c = conn.cursor()
+    c.execute("INSERT INTO habits (user_id, habit, created_at) VALUES (?, ?, ?)",
+              (user_id, habit, datetime.utcnow().isoformat()))
+    conn.commit()
+    conn.close()
+
+def get_habits(user_id, limit=5):
+    conn = sqlite3.connect("bot_users.db")
+    c = conn.cursor()
+    c.execute("SELECT habit, created_at FROM habits WHERE user_id=? ORDER BY created_at DESC LIMIT ?", (user_id, limit))
+    results = c.fetchall()
+    conn.close()
+    return results
 
 # ====== Monthly Usage Reset ======
 def reset_usage():
@@ -306,59 +384,7 @@ def reset_usage():
     except Exception as e:
         logger.error(f"❌ Usage reset error: {e}")
 
-# ====== Daily Coaching Auto-Send ======
-async def send_daily_coaching():
-    """Send daily coaching message to all premium_plus users"""
-    try:
-        conn = sqlite3.connect("bot_users.db")
-        c = conn.cursor()
-        c.execute("SELECT user_id FROM users WHERE plan='premium_plus'")
-        users = c.fetchall()
-        conn.close()
-        
-        if not users:
-            logger.info("No premium_plus users to send daily coaching.")
-            return
-        
-        # Generate daily coaching message using AI
-        prompt = (
-            "မင်္ဂလာပါ၊ ဒီနေ့အတွက် နေ့စဉ် ဘဝလမ်းညွှန်စကား (Daily Coaching Message) ကို ဖန်တီးပေးပါ။\n\n"
-            "မစ္စတာသန်း (Mr.T) ရဲ့ အသံနဲ့ ရေးပါ။\n"
-            "ဒီနေ့အတွက် အဓိက အကြောင်းအရာ ၃ ခုက -\n"
-            "1️⃣ ယုံကြည်မှု (Confidence)\n"
-            "2️⃣ အလုပ်အကိုင် (Career)\n"
-            "3️⃣ ငွေကြေးအတွေးအခေါ် (Money Mindset)\n\n"
-            "အားတက်စရာ၊ လက်တွေ့ကျတဲ့ အကြံပြုချက်၊ မိုတီဗေးရှင်း စကားတွေ ပါစေ။"
-        )
-        
-        message = await ask_model(prompt)
-        if not message or len(message) < 10:
-            message = "🌅 ဒီနေ့အတွက် အကောင်းဆုံး နေ့တစ်နေ့ ဖြစ်ပါစေ။ သင့်ရဲ့ အိပ်မက်တွေကို ယုံကြည်ပြီး ဆက်လက်လုပ်ဆောင်ပါ။"
-        
-        # Send to each premium_plus user
-        bot = None  # We'll get bot from context later
-        sent = 0
-        for user in users:
-            try:
-                # This needs bot instance - we'll handle via scheduler with bot context
-                logger.info(f"Daily coaching sent to {user[0]}")
-                sent += 1
-            except Exception as e:
-                logger.error(f"Failed to send daily coaching to {user[0]}: {e}")
-        
-        logger.info(f"✅ Daily coaching sent to {sent} premium_plus users.")
-    except Exception as e:
-        logger.error(f"❌ Daily coaching error: {e}")
-
-def run_scheduler():
-    schedule.every(30).days.do(reset_usage)
-    schedule.every().day.at("08:00").do(lambda: asyncio.run(send_daily_coaching()))
-    logger.info("⏰ Scheduler started. Reset usage every 30 days, daily coaching at 8:00 AM.")
-    while True:
-        schedule.run_pending()
-        time.sleep(60)
-
-# ====== OpenRouter AI Call (with Coaching Mode) ======
+# ====== OpenRouter AI Call ======
 system_prompt = (
     "သင်ဟာ မစ္စတာသန်း (Mr.T) — funny, friendly, motivational AI Bot ဖြစ်ပါတယ်။\n\n"
     "မင်းရဲ့ အဓိက ကျွမ်းကျင်မှု နယ်ပယ် (၆) ခုက -\n"
@@ -402,6 +428,128 @@ async def ask_model(prompt):
         else:
             raise Exception("Unexpected API response: " + str(result))
 
+# ====== Daily Coaching (Auto send to premium_plus users) ======
+async def send_daily_coaching(bot):
+    """Send daily coaching message to all premium_plus users"""
+    try:
+        conn = sqlite3.connect("bot_users.db")
+        c = conn.cursor()
+        c.execute("SELECT user_id, goals, career, money_mindset FROM users WHERE plan='premium_plus'")
+        users = c.fetchall()
+        conn.close()
+        
+        if not users:
+            logger.info("No premium_plus users to send daily coaching.")
+            return
+        
+        sent = 0
+        for user in users:
+            user_id, goals, career, money_mindset = user
+            
+            # Personalized prompt based on user profile
+            profile_context = ""
+            if goals:
+                profile_context += f"- Goals: {goals}\n"
+            if career:
+                profile_context += f"- Career: {career}\n"
+            if money_mindset:
+                profile_context += f"- Money Mindset: {money_mindset}\n"
+            
+            prompt = (
+                f"မစ္စတာသန်း (Mr.T) ရဲ့ အသံနဲ့ ဒီ User အတွက် နေ့စဉ် ကိုယ်ပိုင် Coaching Message ကို ဖန်တီးပေးပါ။\n\n"
+                f"User Profile:\n{profile_context if profile_context else 'No specific profile yet.'}\n\n"
+                f"ဒီနေ့အတွက် အဓိက အကြောင်းအရာ ၃ ခုက -\n"
+                f"1️⃣ ယုံကြည်မှု (Confidence)\n"
+                f"2️⃣ အလုပ်အကိုင် / ဘဝခရီးလမ်း (Career / Life Path)\n"
+                f"3️⃣ ငွေကြေးအတွေးအခေါ် (Money Mindset)\n\n"
+                f"အားတက်စရာ၊ လက်တွေ့ကျတဲ့ အကြံပြုချက်၊ မိုတီဗေးရှင်း စကားတွေ ပါစေ။"
+            )
+            
+            message = await ask_model(prompt)
+            if not message or len(message) < 10:
+                message = "🌅 ဒီနေ့အတွက် အကောင်းဆုံး နေ့တစ်နေ့ ဖြစ်ပါစေ။ သင့်ရဲ့ အိပ်မက်တွေကို ယုံကြည်ပြီး ဆက်လက်လုပ်ဆောင်ပါ။"
+            
+            try:
+                await bot.send_message(
+                    chat_id=int(user_id),
+                    text=f"🔥 **Daily Coaching Message**\n\n{message}"
+                )
+                sent += 1
+                await asyncio.sleep(0.05)
+            except Exception as e:
+                logger.error(f"Failed to send daily coaching to {user_id}: {e}")
+        
+        logger.info(f"✅ Daily coaching sent to {sent} premium_plus users.")
+    except Exception as e:
+        logger.error(f"❌ Daily coaching error: {e}")
+
+# ====== Weekly Report (Auto send to premium_plus users) ======
+async def send_weekly_report(bot):
+    """Send weekly progress report to all premium_plus users"""
+    try:
+        conn = sqlite3.connect("bot_users.db")
+        c = conn.cursor()
+        c.execute("SELECT user_id, goals FROM users WHERE plan='premium_plus'")
+        users = c.fetchall()
+        conn.close()
+        
+        if not users:
+            logger.info("No premium_plus users to send weekly report.")
+            return
+        
+        sent = 0
+        for user in users:
+            user_id, goals = user
+            
+            # Get referral count for the week
+            ref_count = get_referral_weekly_count(user_id)
+            
+            # Get habits
+            habits = get_habits(user_id)
+            habit_text = "\n".join([f"- {h[0]} ({h[1][:10]})" for h in habits]) if habits else "No habits tracked yet."
+            
+            prompt = (
+                f"မစ္စတာသန်း (Mr.T) ရဲ့ အသံနဲ့ ဒီ User အတွက် အပတ်စဉ် တိုးတက်မှု အစီရင်ခံစာ (Weekly Progress Report) ကို ရေးပေးပါ။\n\n"
+                f"User Goals: {goals if goals else 'Not set yet.'}\n\n"
+                f"ဒီအပတ်အတွက် သတင်းအချက်အလက်များ:\n"
+                f"- Referrals this week: {ref_count} (50 free calls each)\n"
+                f"- Habits tracked: {habit_text}\n\n"
+                f"အပတ်စဉ် Reflection:\n"
+                f"1️⃣ ဒီအပတ်မှာ သင့်ကိုယ်သင့် ဂုဏ်ယူစရာ ၃ ခု\n"
+                f"2️⃣ လာမယ့်အပတ်အတွက် Goal ၃ ခု\n"
+                f"3️⃣ ဒီအပတ်မှာ သင်ယူခဲ့တဲ့ အဓိက သင်ခန်းစာ\n\n"
+                f"အားတက်စရာ၊ လက်တွေ့ကျတဲ့ အကြံပြုချက်တွေ ပါစေ။"
+            )
+            
+            message = await ask_model(prompt)
+            if not message or len(message) < 10:
+                message = "📅 ဒီအပတ်အတွက် သင် proud ဖြစ်ရမယ့် အရာ ၃ ခုကို စဉ်းစားပါ။ လာမယ့်အပတ်အတွက် Goal အသစ်တွေ သတ်မှတ်ပါ။"
+            
+            try:
+                await bot.send_message(
+                    chat_id=int(user_id),
+                    text=f"📊 **Weekly Progress Report**\n\n{message}"
+                )
+                sent += 1
+                await asyncio.sleep(0.05)
+            except Exception as e:
+                logger.error(f"Failed to send weekly report to {user_id}: {e}")
+        
+        logger.info(f"✅ Weekly report sent to {sent} premium_plus users.")
+    except Exception as e:
+        logger.error(f"❌ Weekly report error: {e}")
+
+# ====== Scheduler ======
+def run_scheduler(bot):
+    schedule.every(30).days.do(reset_usage)
+    schedule.every().day.at("08:00").do(lambda: asyncio.run(send_daily_coaching(bot)))
+    schedule.every().monday.at("20:00").do(lambda: asyncio.run(send_weekly_report(bot)))
+    logger.info("⏰ Scheduler started. Reset usage every 30 days, daily coaching at 8:00 AM, weekly report on Monday at 8:00 PM.")
+    
+    while True:
+        schedule.run_pending()
+        time.sleep(60)
+
 # ====== Telegram Bot Command Handlers ======
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
@@ -426,9 +574,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
         "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n"
         "/referral - သင့် referral link ရယူရန်\n"
+        "/profile - ကိုယ်ရေးအချက်အလက် သိမ်းရန်\n"
+        "/habit <habit> - နေ့စဉ်အလေ့အကျင့် သိမ်းရန်\n"
+        "/myhabits - သင့် habits များကိုကြည့်ရန်\n"
         "/help - အကူအညီ\n\n"
-        "💡 သိကောင်းစရာ: အခမဲ့ သုံးချင်ရင် `free` နှိပ်ပါ၊ ပိုမိုအဆင့်မြင့်စွာ လုပ်ဆောင်စေချင်ရင် `basic` သို့မဟုတ် `premium` ကိုရွေးပြီး သုံးပါ။\n"
-        "🔥 VIP Coaching အတွက် `premium_plus` ကို ရွေးပါ။"
+        "💡 သိကောင်းစရာ: အခမဲ့ သုံးချင်ရင် `free` နှိပ်ပါ၊ ပိုမိုအဆင့်မြင့်စွာ လုပ်ဆောင်စေချင်ရင် `basic` သို့မဟုတ် `premium` ကိုရွေးပြီး သုံးပါ။"
     )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -440,7 +590,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/ask <question> - AI ကို မေးမြန်းရန်\n"
         "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
         "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n"
-        "/referral - သင့် referral link ရယူရန်\n\n"
+        "/referral - သင့် referral link ရယူရန်\n"
+        "/profile - ကိုယ်ရေးအချက်အလက် သိမ်းရန် (goals, career, money_mindset, etc.)\n"
+        "/habit <habit> - နေ့စဉ်အလေ့အကျင့် သိမ်းရန်\n"
+        "/myhabits - သင့် habits များကိုကြည့်ရန်\n\n"
         "🎯 **ကျွန်တော် အကြံပေးနိုင်တဲ့ နယ်ပယ်များ**\n"
         "1️⃣ Life Coach\n"
         "2️⃣ Relationship Coach\n"
@@ -448,18 +601,13 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "4️⃣ Productivity Coach\n"
         "5️⃣ Fitness Coach\n"
         "6️⃣ Business Coach\n\n"
-        "🔥 **Premium Plus (VIP Coaching)**\n"
-        "• 5,000 ကြိမ် သုံးခွင့်\n"
-        "• နေ့စဉ် coaching message\n"
-        "• ကိုယ်ရေးကိုယ်တာ အကြံပြုချက်\n"
-        "• 50,000 MMK / month\n\n"
         "**Admin Commands:**\n"
         "/verify <user_id> <plan> - Plan ပြောင်းရန်\n"
         "/pending_proofs - Pending Proofs စာရင်းကြည့်ရန်\n"
         "/approve_proof <user_id> - Proof အတည်ပြုရန်\n"
         "/reject_proof <user_id> - Proof ပယ်ရန်\n"
         "/broadcast <message> - အားလုံးကို message ပို့ရန်\n\n"
-        "💡 **Auto Subscribe:** `free`, `basic`, `premium`, `premium_plus` လို့ရိုက်ရင် အလိုအလျောက် subscribe လုပ်ပေးမယ်။"
+        "💡 **Auto Subscribe:** `free`, `basic`, `premium`, `premium_plus` လို့ရိုက်ရင် အလိုအလျောက် subscribe လုပ်ပေးမယ်。"
     )
 
 async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -469,12 +617,15 @@ async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ref_link = f"https://t.me/{bot_username}?start={ref_code}"
     
     inviter_count = get_referral_count(user_id)
+    weekly_count = get_referral_weekly_count(user_id)
     
     await update.message.reply_text(
         f"🔗 **သင့် Referral Link**\n\n"
         f"`{ref_link}`\n\n"
-        f"📊 သင် ဖိတ်ထားသူ အရေအတွက်: **{inviter_count}**\n\n"
-        "✨ သူငယ်ချင်းတွေကို ဖိတ်လိုက်ပါ။ သင် **20 ကြိမ် free usage** ရပါမယ်။"
+        f"📊 သင် ဖိတ်ထားသူ အရေအတွက်: **{inviter_count}** ယောက်\n"
+        f"📊 ဒီအပတ် ဖိတ်ထားသူ: **{weekly_count}** ယောက်\n\n"
+        "🎁 **Referral Reward**: ဖိတ်ခေါ်တဲ့သူတိုင်းအတွက် **50 ကြိမ် Free Usage** ရပါမယ်！\n"
+        "💪 Referral Hero ဖြစ်ဖို့ သူငယ်ချင်းတွေကို မျှဝေလိုက်ပါ။"
     )
 
 async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -489,11 +640,11 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [
             InlineKeyboardButton("📌 Free", callback_data="sub_free"),
-            InlineKeyboardButton("⭐ Basic (10k MMK)", callback_data="sub_basic")
+            InlineKeyboardButton("⭐ Basic (10,000 MMK)", callback_data="sub_basic")
         ],
         [
-            InlineKeyboardButton("💎 Premium (30k MMK)", callback_data="sub_premium"),
-            InlineKeyboardButton("🔥 VIP (50k MMK)", callback_data="sub_premium_plus")
+            InlineKeyboardButton("💎 Premium (30,000 MMK)", callback_data="sub_premium"),
+            InlineKeyboardButton("👑 Premium+ (50,000 MMK)", callback_data="sub_premium_plus")
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -503,7 +654,8 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📊 Free: {PLAN_LIMITS['free']['limit']} ကြိမ် (အခမဲ့)\n"
         f"📊 Basic: {PLAN_LIMITS['basic']['limit']} ကြိမ် (10,000 MMK)\n"
         f"📊 Premium: {PLAN_LIMITS['premium']['limit']} ကြိမ် (30,000 MMK)\n"
-        f"🔥 VIP: {PLAN_LIMITS['premium_plus']['limit']} ကြိမ် (50,000 MMK) + နေ့စဉ် Coaching",
+        f"👑 Premium+: {PLAN_LIMITS['premium_plus']['limit']} ကြိမ် (50,000 MMK)\n\n"
+        "✨ Premium+ includes: Daily Coaching + Weekly Report + Habit Tracker",
         reply_markup=reply_markup
     )
 
@@ -526,34 +678,107 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         price_mmk = PLAN_LIMITS[plan]["price"]
         price_usd = get_price_usd(price_mmk)
         
+        extra_features = ""
         if plan == "premium_plus":
-            await query.edit_message_text(
-                f"📌 **{plan}** (VIP Coaching) Plan ကို ရွေးလိုက်ပါပြီ။\n"
-                f"💰 စျေးနှုန်း: {price_mmk:,} MMK (~${price_usd}) / month\n"
-                f"📊 သုံးခွင့်: {PLAN_LIMITS[plan]['limit']} ကြိမ်\n\n"
-                f"🔥 နေ့စဉ် coaching message ကို နံနက် ၈ နာရီမှာ ရရှိမှာပါ။\n\n"
-                f"📸 ကျေးဇူးပြုပြီး ငွေသွင်း proof screenshot ကို ပို့ပါ။\n\n"
-                f"{PAYMENT_INFO}"
-            )
-        else:
-            await query.edit_message_text(
-                f"📌 **{plan}** Plan ကို ရွေးလိုက်ပါပြီ။\n"
-                f"💰 စျေးနှုန်း: {price_mmk:,} MMK (~${price_usd}) / month\n\n"
-                f"📸 ကျေးဇူးပြုပြီး ငွေသွင်း proof screenshot ကို ပို့ပါ။\n\n"
-                f"{PAYMENT_INFO}"
-            )
+            extra_features = "\n\n✨ **Premium+ Features:**\n✅ Daily Coaching Messages\n✅ Weekly Progress Reports\n✅ Habit Tracker\n✅ Personalized Advice"
+        
+        await query.edit_message_text(
+            f"📌 **{plan}** Plan ကို ရွေးလိုက်ပါပြီ။\n"
+            f"💰 စျေးနှုန်း: {price_mmk:,} MMK (~${price_usd}) / month\n\n"
+            f"📸 ကျေးဇူးပြုပြီး ငွေသွင်း proof screenshot ကို ပို့ပါ။\n\n"
+            f"{PAYMENT_INFO}{extra_features}"
+        )
+
+async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Set user profile fields: goals, weaknesses, dream, career, money_mindset, relationship"""
+    user_id = str(update.effective_user.id)
+    
+    if not context.args:
+        await update.message.reply_text(
+            "📝 **Profile Setup**\n\n"
+            "Usage: /profile <field> <value>\n\n"
+            "Available fields: goals, weaknesses, dream, career, money_mindset, relationship\n\n"
+            "Examples:\n"
+            "/profile goals Become a successful entrepreneur\n"
+            "/profile career Software Engineer\n"
+            "/profile money_mindset I want to save 1 million MMK"
+        )
+        return
+    
+    if len(context.args) < 2:
+        await update.message.reply_text("❌ Please provide: /profile <field> <value>")
+        return
+    
+    field = context.args[0].lower()
+    value = " ".join(context.args[1:])
+    
+    valid_fields = ["goals", "weaknesses", "dream", "career", "money_mindset", "relationship"]
+    if field not in valid_fields:
+        await update.message.reply_text(f"❌ Invalid field. Allowed: {', '.join(valid_fields)}")
+        return
+    
+    update_profile(user_id, field, value)
+    await update.message.reply_text(f"✅ {field} updated successfully!\n📝 {field}: {value}")
+
+async def habit(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Add a daily habit"""
+    user_id = str(update.effective_user.id)
+    
+    if not context.args:
+        await update.message.reply_text(
+            "📋 **Habit Tracker**\n\n"
+            "Usage: /habit <habit description>\n\n"
+            "Example: /habit Read 30 minutes every day\n"
+            "Example: /habit Exercise 15 minutes"
+        )
+        return
+    
+    habit_text = " ".join(context.args)
+    add_habit(user_id, habit_text)
+    
+    await update.message.reply_text(
+        f"✅ Habit saved successfully!\n📋 {habit_text}\n\n"
+        "Keep tracking your habits daily! 💪"
+    )
+
+async def myhabits(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show user's habits"""
+    user_id = str(update.effective_user.id)
+    habits = get_habits(user_id)
+    
+    if not habits:
+        await update.message.reply_text(
+            "📭 You haven't tracked any habits yet.\n"
+            "Start tracking: /habit <habit description>"
+        )
+        return
+    
+    msg = "📋 **Your Habits**\n\n"
+    for i, (habit, created_at) in enumerate(habits, 1):
+        date = created_at[:10] if created_at else "Unknown"
+        msg += f"{i}. {habit}\n   📅 {date}\n\n"
+    
+    await update.message.reply_text(msg)
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     user = get_user(user_id)
     if not user:
         add_user(user_id, "free")
-        user = ("free", 0, "none", None, 0, None)
-    plan, usage, proof_status, _, price, proof_timestamp = user
+        user = ("free", 0, "none", None, 0, None, None, None, None, None, None, None)
+    plan, usage, proof_status, _, price, proof_timestamp, goals, weaknesses, dream, career, money_mindset, relationship = user
     limit = PLAN_LIMITS[plan]["limit"]
     remaining = limit - usage
     price_usd = get_price_usd(price)
     ref_count = get_referral_count(user_id)
+    
+    profile_summary = ""
+    if goals:
+        profile_summary += f"\n🎯 Goals: {goals}"
+    if career:
+        profile_summary += f"\n💼 Career: {career}"
+    if money_mindset:
+        profile_summary += f"\n💰 Money Mindset: {money_mindset}"
     
     await update.message.reply_text(
         f"📊 **Your Status**\n"
@@ -562,7 +787,8 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📊 သုံးပြီးသား: {usage} / {limit} ကြိမ်\n"
         f"✅ ကျန်သုံးခွင့်: **{remaining}** ကြိမ်\n"
         f"🔍 Proof Status: **{proof_status}**\n"
-        f"👥 ဖိတ်ထားသူ: **{ref_count}** ယောက်"
+        f"👥 ဖိတ်ထားသူ: **{ref_count}** ယောက်\n"
+        f"📋 Profile:{profile_summary if profile_summary else ' Not set yet. Use /profile to set.'}"
     )
 
 async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -737,7 +963,7 @@ async def approve_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user_data:
         await update.message.reply_text(f"❌ User `{target_user}` မတွေ့ပါ။")
         return
-    plan, _, _, _, _, _ = user_data
+    plan, _, _, _, _, _, _, _, _, _, _, _ = user_data
     price = PLAN_LIMITS[plan]["price"]
     
     conn = sqlite3.connect("bot_users.db")
@@ -824,6 +1050,9 @@ def run_bot():
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("subscribe", subscribe))
     app.add_handler(CommandHandler("referral", referral))
+    app.add_handler(CommandHandler("profile", profile))
+    app.add_handler(CommandHandler("habit", habit))
+    app.add_handler(CommandHandler("myhabits", myhabits))
     app.add_handler(CommandHandler("status", status))
     app.add_handler(CommandHandler("ask", ask))
     app.add_handler(CommandHandler("broadcast", broadcast))
@@ -837,25 +1066,22 @@ def run_bot():
     
     logger.info("✅ Bot ready and polling started!")
     
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(app.run_polling(allowed_updates=Update.ALL_TYPES))
-
-# ====== Run Flask ======
-def run_flask():
-    port = int(os.environ.get("PORT", 5000))
-    flask_app.run(host="0.0.0.0", port=port)
-
-# ====== Main ======
-if __name__ == "__main__":
-    init_db()
-    
-    scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
+    # Scheduler thread with bot instance
+    scheduler_thread = threading.Thread(target=run_scheduler, args=(app.bot,), daemon=True)
     scheduler_thread.start()
     logger.info("🔄 Scheduler thread started.")
     
+    # Flask thread
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
     logger.info("🌐 Flask server thread started.")
     
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
+
+def run_flask():
+    port = int(os.environ.get("PORT", 5000))
+    flask_app.run(host="0.0.0.0", port=port)
+
+if __name__ == "__main__":
+    init_db()
     run_bot()
