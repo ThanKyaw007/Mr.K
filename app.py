@@ -1407,6 +1407,7 @@ def main():
     application.add_handler(CommandHandler("myhabits", myhabits))
     application.add_handler(CommandHandler("proof", proof))
     application.add_handler(CommandHandler("referral", referral))
+    application.add_handler(CommandHandler("sum", sum_numbers))
     application.add_handler(CommandHandler("verify", verify))
     application.add_handler(CommandHandler("pending_proofs", pending_proofs))
     application.add_handler(CommandHandler("approve_proof", approve_proof))
@@ -1427,4 +1428,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-    application.add_handler(CommandHandler("sum", sum_numbers))
+   
