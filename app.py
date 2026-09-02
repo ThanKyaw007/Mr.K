@@ -1971,19 +1971,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await subscribe(update, context)
         return
 
-    if chat_type in ["group", "supergroup"]:
+   if chat_type in ["group", "supergroup"]:
     if await is_bot_mentioned(update, context):
-        for name in BOT_NAMES:
-            if name.lower() in text.lower():
-                text = re.sub(name, "", text, flags=re.IGNORECASE)
-        bot_username = (await context.bot.get_me()).username
-        if bot_username:
-            text = re.sub(f"@{bot_username}", "", text, flags=re.IGNORECASE)
-        text = text.strip()
-        if not text:
-            return
+        # ... (နာမည်ဖယ်တာ)
         if not check_limit(user_id):
-            await update.message.reply_text("❌ သုံးခွင့်ကုန်သွားပါပြီ။ Plan အသစ်ရွေးပါ။")
+            await update.message.reply_text("❌ သုံးခွင့်ကုန်သွားပါပြီ။")
+            return
+        
+        # ✅ Local Response စစ်ဆေးခြင်း (Token မကုန်စေရန်)
+        local_answer = get_local_response(text)
+        if local_answer:
+            # ✅ increment_usage ကို မခေါ်ပါနဲ့ (Token မကုန်စေရန်)
+            await update.message.reply_text(local_answer)
             return
         
         # ✅ ဒီနေရာမှာ Local Response ကို အရင်စစ်ပါ
