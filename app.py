@@ -12,14 +12,10 @@ import logging
 import schedule
 import time
 import xml.etree.ElementTree as ET
-import re
 import random
-import time
 from datetime import datetime, timedelta
-from datetime import datetime
 from docx import Document
 from gtts import gTTS
-from datetime import datetime
 from difflib import SequenceMatcher
 from flask import Flask, request, Response, send_file
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -43,7 +39,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ====== Configuration (Security: env variables with fallback) ======
 # ====== Configuration ======
 TELEGRAM_BOT_TOKEN = os.environ.get("BOT_TOKEN") or "YOUR_BOT_TOKEN_HERE"
 OPENROUTER_API_KEY = os.environ.get("OR_KEY") or "YOUR_OPENROUTER_KEY_HERE"
@@ -291,158 +286,17 @@ def backup_and_send(bot):
         logger.error(f"❌ Backup error: {e}")
 
 # ====== Database Functions ======
-
 def init_db():
     conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
     
-    # ... existing tables ...
-    
-    # ✅ New table for auto-verify with expiry
-    c.execute("""CREATE TABLE IF NOT EXISTS transactions (
-        tx_id TEXT PRIMARY KEY,
-        user_id TEXT,
-        plan TEXT,
-        timestamp TEXT,
-        used BOOLEAN DEFAULT 0,
-        expiry_date TEXT
-    )""")
-    
-    c.execute("CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id)")
-    c.execute("CREATE INDEX IF NOT EXISTS idx_transactions_plan ON transactions(plan)")
-    
-    conn.commit()
-    conn.close()
-    logger.info("✅ Database initialized successfully.")
-
-# ====== Rate Limiting ======
-verify_attempts = {}
-
-# ====== Verify ID (User Self-Verify) ======
-async def verifyid(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-
-    if len(context.args) < 1:
-        return await update.message.reply_text("Usage: /verifyid <transaction_code>")
-
-    tx_id = context.args[0]
-
-    if not re.match(r"^\d{5}$", tx_id):
-        return await update.message.reply_text("❌ Invalid transaction code. Must be exactly 5 digits.")
-
-    # ✅ Rate limiting
-    now = time.time()
-    if user_id not in verify_attempts:
-        verify_attempts[user_id] = []
-    verify_attempts[user_id] = [t for t in verify_attempts[user_id] if now - t < 600]
-    
-    if len(verify_attempts[user_id]) >= 5:
-        return await update.message.reply_text(
-            "❌ Too many attempts. Please wait 10 minutes and try again."
-        )
-    verify_attempts[user_id].append(now)
-
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT plan, expiry_date FROM transactions WHERE tx_id=? AND user_id=?", (tx_id, user_id))
-    row = c.fetchone()
-
-    if not row:
-        conn.close()
-        return await update.message.reply_text("❌ Transaction code not found or not assigned to you.")
-
-    plan, expiry_date = row
-    
-    if expiry_date and datetime.utcnow().isoformat() > expiry_date:
-        conn.close()
-        return await update.message.reply_text("❌ This transaction code has expired. Please contact admin.")
-
-    # ✅ await နဲ့ ခေါ်ပါ
-    success = await auto_verify_payment(user_id, tx_id, plan, context.bot)
-    
-    if success:
-        await update.message.reply_text(
-            f"✅ Transaction {tx_id} verified.\n"
-            f"🎉 Your plan upgraded to {plan}."
-        )
-    else:
-        await update.message.reply_text("❌ Transaction code already used or error occurred.")
-
-        
-        # Admin notification
-        for admin_id in ADMIN_IDS:
-            try:
-                await bot.send_message(
-                    chat_id=admin_id,
-                    text=f"📋 Auto-verify completed!\nUser: {user_id}\nPlan: {plan}\nCode: {tx_id}"
-                )
-            except Exception as e:
-                logger.error(f"Admin notification error: {e}")
-        
-        logger.info(f"✅ Auto-verified: user={user_id}, tx={tx_id}, plan={plan}")
-        return True
-    except Exception as e:
-        logger.error(f"❌ Auto verify error: {e}")
-        return False
-
-# ====== Admin: Generate Transaction Code ======
-async def gen_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    if user_id not in [str(a) for a in ADMIN_IDS]:
-        return await update.message.reply_text("❌ Admin only.")
-    
-    if len(context.args) < 2:
-        return await update.message.reply_text("Usage: /gen_code <user_id> <plan>")
-    
-    target_user = context.args[0]
-    plan = context.args[1].lower()
-    
-    if plan not in PLAN_LIMITS:
-        return await update.message.reply_text("❌ Invalid plan.")
-    
-    tx_id = None
-    for _ in range(10):
-        candidate = f"{random.randint(0, 99999):05d}"
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("SELECT tx_id FROM transactions WHERE tx_id=?", (candidate,))
-        exists = c.fetchone()
-        conn.close()
-        if not exists:
-            tx_id = candidate
-            break
-    
-    if not tx_id:
-        return await update.message.reply_text("❌ Failed to generate unique code. Try again.")
-    
-    # ✅ ၇ ရက်ကနေ ၁ ရက်ကို ပြောင်းပါ
-    expiry_date = (datetime.utcnow() + timedelta(days=1)).isoformat()  # 1 day
-    
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("INSERT INTO transactions (tx_id, user_id, plan, timestamp, used, expiry_date) VALUES (?, ?, ?, ?, ?, ?)",
-              (tx_id, target_user, plan, datetime.utcnow().isoformat(), 0, expiry_date))
-    conn.commit()
-    conn.close()
-    
-    await update.message.reply_text(
-        f"✅ Code generated:\n"
-        f"User: {target_user}\n"
-        f"Plan: {plan}\n"
-        f"Code: `{tx_id}`\n"
-        f"Expires: {expiry_date[:10]} (1 day)\n\n"
-        f"User can verify with: /verifyid {tx_id}"
-    )
-
-        
-def init_db():
-    conn = sqlite3.connect("bot_users.db", check_same_thread=False)
-    c = conn.cursor()
+    # ✅ Existing tables (unchanged)
     for col in ["birthdate"]:
         try:
             c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
         except sqlite3.OperationalError:
             pass
+    
     c.execute("""CREATE TABLE IF NOT EXISTS users (
         user_id TEXT PRIMARY KEY,
         plan TEXT DEFAULT 'free',
@@ -459,27 +313,44 @@ def init_db():
         relationship TEXT,
         birthdate TEXT
     )""")
+    
     c.execute("""CREATE TABLE IF NOT EXISTS referrals (
         inviter_id TEXT, invited_id TEXT, timestamp TEXT
     )""")
+    
     c.execute("""CREATE TABLE IF NOT EXISTS habits (
         user_id TEXT, habit TEXT, created_at TEXT
     )""")
+    
     c.execute("""CREATE TABLE IF NOT EXISTS response_cache (
         query TEXT PRIMARY KEY,
         response TEXT,
         created_at TEXT
     )""")
     
-    conn.commit()
-    conn.close()
+    # ✅ NEW: Transactions table for auto-verify
+    c.execute("""CREATE TABLE IF NOT EXISTS transactions (
+        tx_id TEXT PRIMARY KEY,
+        user_id TEXT,
+        plan TEXT,
+        timestamp TEXT,
+        used BOOLEAN DEFAULT 0,
+        expiry_date TEXT
+    )""")
+    
+    c.execute("CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_transactions_plan ON transactions(plan)")
+    
+    # ✅ Migration for existing columns
     for col in ["proof_status", "proof_file_id", "price", "proof_timestamp", "goals", "weaknesses", "dream", "career", "money_mindset", "relationship", "birthdate"]:
         try:
             c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
         except sqlite3.OperationalError:
             pass
+    
     conn.commit()
     conn.close()
+    logger.info("✅ Database initialized successfully.")
 
 def add_user(user_id, plan="free"):
     conn = sqlite3.connect("bot_users.db", check_same_thread=False)
@@ -628,7 +499,6 @@ def reset_usage():
         logger.error(f"❌ Usage reset error: {e}")
 
 # ====== Response Cache ======
-
 def save_cached_response(query: str, response: str):
     conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
@@ -649,7 +519,7 @@ def normalize_text(text: str) -> str:
 def fuzzy_score(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b).ratio()
 
-# ====== Local Responses (ပိုက်ဆံချွေတာရန်) ======
+# ====== Local Responses ======
 LOCAL_RESPONSES = {
     "hello": "ဟယ်လို! မင်္ဂလာပါဗျ။ ဘာကူညီပေးရမလဲ?",
     "hi": "ဟိုင်း! ဒီနေ့ ဘာတွေ လုပ်နေလဲဗျ။",
@@ -714,22 +584,6 @@ LOCAL_RESPONSES = {
     "သိုင်း": "သိုင်းပညာနဲ့ ပတ်သက်ပြီး ဘာသိချင်လဲဗျ။ /ask မှာ မေးကြည့်ပါ။",
     "ကရာတေး": "ကရာတေးအကြောင်း သိချင်ရင် /ask မှာ မေးပါ။",
     "တိုက်ခိုက်နည်း": "တိုက်ခိုက်ရေး၊ ခုခံရေး နည်းပညာတွေအတွက် /ask မှာ မေးပါ။",
-    # အားကစား (Sports)
-    "အားကစား": "အားကစားနဲ့ ပတ်သက်ပြီး ဘာသိချင်လဲဗျ။ ဘောလုံး၊ ဘတ်စကက်၊ ကြက်တောင် အစရှိတဲ့ /ask မှာ မေးကြည့်ပါ။",
-    "ဘောလုံး": "ဘောလုံးအကြောင်း၊ ပွဲစဉ်တွေ၊ နည်းဗျူဟာတွေကို /ask မှာ မေးပါ။",
-    "ကြက်တောင်": "ကြက်တောင်ရိုက်နည်း၊ လေ့ကျင့်နည်းတွေကို /ask မှာ မေးပါ။",
-    "အပြေး": "အပြေးလေ့ကျင့်နည်း၊ မာရသွန်ပြင်ဆင်နည်းကို /ask မှာ မေးပါ။",
-    "fitness": "Fitness နဲ့ ကိုယ်ကာယလေ့ကျင့်ခန်းအကြောင်း /ask မှာ မေးပါ။",
-    "အားကစားသမား": "အားကစားသမားတစ်ယောက်ရဲ့ အာဟာရနဲ့ လေ့ကျင့်ခန်းအစီအစဉ်ကို /ask မှာ မေးပါ။",
-
-    # သိုင်းပညာ (Martial Arts)
-    "သိုင်းပညာ": "သိုင်းပညာ၊ ကိုယ်ခံပညာ၊ လက်ဝှေ့အကြောင်း အသေးစိတ်သိချင်ရင် /ask မှာ မေးပါဗျ။",
-    "လက်ဝှေ့": "လက်ဝှေ့အနုပညာအကြောင်း အသေးစိတ်ကို /ask မှာ မေးပါ။",
-    "ကိုယ်ခံပညာ": "ကိုယ်ခံပညာသင်ဖို့ ဘယ်လိုစမလဲဆိုတာ /ask မှာ မေးပါ။",
-    "သိုင်း": "သိုင်းပညာနဲ့ ပတ်သက်ပြီး ဘာသိချင်လဲဗျ။ /ask မှာ မေးကြည့်ပါ။",
-    "ကရာတေး": "ကရာတေးအကြောင်း သိချင်ရင် /ask မှာ မေးပါ။",
-    "တိုက်ခိုက်နည်း": "တိုက်ခိုက်ရေး၊ ခုခံရေး နည်းပညာတွေအတွက် /ask မှာ မေးပါ။",
-
     # ဗေဒင် (Astrology)
     "ဗေဒင်": "ဗေဒင်မေးချင်ရင် မင်းရဲ့ မွေးနေ့ကို /profile birthdate : <မွေးနေ့> လို့ သိမ်းထားပါ၊ ပြီးရင် /ask မှာ မေးပါ။",
     "ရာသီခွင်": "ရာသီခွင်အကြောင်း (ဥပမာ - မိဿ၊ ပြိဿ စသည်) သိချင်ရင် /ask မှာ မေးပါဗျ။",
@@ -923,23 +777,23 @@ LOCAL_RESPONSES = {
     "တရုတ်စာ": "တရုတ်စကားပြောနှင့် တရုတ်ဘာသာပြန်ခြင်းအတွက် /ask မှာ မေးပါ။",
 }
 
+    # ... (LOCAL_RESPONSES အကုန်လုံး အတိုင်းသား)
+
+
 # ====== Optimized Local Response Function ======
 def get_local_response(user_text: str) -> str | None:
     if not user_text:
         return None
 
-    # 1) Exact key match (O(1))
     text_raw = user_text.strip()
     text_lower = text_raw.lower()
     if text_lower in LOCAL_RESPONSES:
         return LOCAL_RESPONSES[text_lower]
 
-    # 2) Normalized exact match (still O(1))
     norm = normalize_text(text_raw)
     if norm in LOCAL_RESPONSES:
         return LOCAL_RESPONSES[norm]
 
-    # 3) Fuzzy match (O(N) but N is small & fast)
     best_key = None
     best_score = 0.0
     for key in LOCAL_RESPONSES.keys():
@@ -948,13 +802,12 @@ def get_local_response(user_text: str) -> str | None:
             best_score = score
             best_key = key
 
-    # 4) Threshold to avoid nonsense matches
     if best_score >= 0.75 and best_key:
         return LOCAL_RESPONSES[best_key]
 
     return None
 
-# ====== Daily Coaching & System Prompt (120+ Domains) ======
+# ====== System Prompt ======
 system_prompt = (
     "သင်ဟာ မစ္စတာသန်း (Mr.T) — funny, friendly, motivational AI Bot ဖြစ်ပါတယ်။\n"
     "မြန်မာပြည်က လူတွေအတွက် အကောင်းဆုံး ဘဝအကြံပေး၊ နည်းပညာရှင်၊ စီးပွားရေးလမ်းညွှန်နဲ့ နေ့စဉ်ပြဿနာဖြေရှင်းပေးသူ ဖြစ်ပါတယ်။\n\n"
@@ -1040,7 +893,8 @@ system_prompt = (
     "ဥပဒေ၊ ကျန်းမာရေး၊ ငွေကြေးဆိုင်ရာ အကြံပြုချက်များသည် အထွေထွေ အချက်အလက်သာဖြစ်ပြီး ကျွမ်းကျင်သူများနှင့် တိုင်ပင်ရန် သတိပေးရမယ်။"
 )
 
-# ====== AI Model (DeepSeek First, GPT-4o-mini Fallback) ======
+
+# ====== AI Model ======
 async def ask_model(prompt: str, user_id: str = None) -> str:
     user_context = ""
     cache_allowed = True
@@ -1066,7 +920,7 @@ async def ask_model(prompt: str, user_id: str = None) -> str:
         if cached:
             return cached
 
-    # DeepSeek Retry with exponential backoff
+    # DeepSeek Retry
     for attempt in range(2):
         try:
             async with httpx.AsyncClient(timeout=30) as client:
@@ -1100,7 +954,7 @@ async def ask_model(prompt: str, user_id: str = None) -> str:
             if attempt == 1:
                 logger.error(f"DeepSeek failed: {e}. Falling back to GPT-4o-mini.")
                 break
-            await asyncio.sleep(2 ** attempt)  # exponential backoff
+            await asyncio.sleep(2 ** attempt)
 
     # GPT-4o-mini Retry
     for attempt in range(2):
@@ -1141,7 +995,7 @@ async def send_daily_coaching(bot):
     try:
         conn = sqlite3.connect("bot_users.db", check_same_thread=False)
         c = conn.cursor()
-        c.execute("SELECT user_id FROM users WHERE plan IN ('free', 'premium_plus')")  # ✅ ဒီလိုပြင်ပါ
+        c.execute("SELECT user_id FROM users WHERE plan IN ('free', 'premium_plus')")
         users = c.fetchall()
         conn.close()
 
@@ -1169,11 +1023,10 @@ async def send_daily_coaching(bot):
 def run_scheduler(bot):
     schedule.every(30).days.do(reset_usage)
     
-    # မြန်မာအချိန် အတွက်
     mm_tz = pytz.timezone("Asia/Yangon")
     now_mm = datetime.now(mm_tz)
     
-    schedule.every().day.at("08:00").do(lambda: asyncio.run(send_daily_coaching(bot)))  # ✅ asyncio.run သုံးပါ
+    schedule.every().day.at("08:00").do(lambda: asyncio.run(send_daily_coaching(bot)))
     schedule.every().day.at("03:00").do(lambda: backup_and_send(bot))
     
     logger.info("⏰ Scheduler started (Myanmar Time).")
@@ -1181,6 +1034,149 @@ def run_scheduler(bot):
         schedule.run_pending()
         time.sleep(60)
 
+# ====== Rate Limiting for verifyid ======
+verify_attempts = {}
+
+# ====== Auto Verify Payment ======
+async def auto_verify_payment(user_id: str, tx_id: str, plan: str, bot) -> bool:
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+
+        c.execute("SELECT used, expiry_date FROM transactions WHERE tx_id=? AND user_id=?", (tx_id, user_id))
+        row = c.fetchone()
+        if not row:
+            conn.close()
+            return False
+        
+        used, expiry_date = row
+        if used == 1:
+            conn.close()
+            return False
+        
+        if expiry_date and datetime.utcnow().isoformat() > expiry_date:
+            conn.close()
+            return False
+
+        c.execute("UPDATE transactions SET used=1 WHERE tx_id=? AND user_id=?", (tx_id, user_id))
+        price = PLAN_LIMITS[plan]["price"]
+        c.execute("UPDATE users SET plan=?, proof_status='approved', usage_count=0, price=? WHERE user_id=?",
+                  (plan, price, user_id))
+        conn.commit()
+        conn.close()
+        
+        # Admin notification
+        for admin_id in ADMIN_IDS:
+            try:
+                await bot.send_message(
+                    chat_id=admin_id,
+                    text=f"📋 Auto-verify completed!\nUser: {user_id}\nPlan: {plan}\nCode: {tx_id}"
+                )
+            except Exception as e:
+                logger.error(f"Admin notification error: {e}")
+        
+        logger.info(f"✅ Auto-verified: user={user_id}, tx={tx_id}, plan={plan}")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Auto verify error: {e}")
+        return False
+
+# ====== Admin: Generate Transaction Code ======
+async def gen_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    if user_id not in [str(a) for a in ADMIN_IDS]:
+        return await update.message.reply_text("❌ Admin only.")
+    
+    if len(context.args) < 2:
+        return await update.message.reply_text("Usage: /gen_code <user_id> <plan>")
+    
+    target_user = context.args[0]
+    plan = context.args[1].lower()
+    
+    if plan not in PLAN_LIMITS:
+        return await update.message.reply_text("❌ Invalid plan.")
+    
+    tx_id = None
+    for _ in range(10):
+        candidate = f"{random.randint(0, 99999):05d}"
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT tx_id FROM transactions WHERE tx_id=?", (candidate,))
+        exists = c.fetchone()
+        conn.close()
+        if not exists:
+            tx_id = candidate
+            break
+    
+    if not tx_id:
+        return await update.message.reply_text("❌ Failed to generate unique code. Try again.")
+    
+    expiry_date = (datetime.utcnow() + timedelta(days=1)).isoformat()
+    
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("INSERT INTO transactions (tx_id, user_id, plan, timestamp, used, expiry_date) VALUES (?, ?, ?, ?, ?, ?)",
+              (tx_id, target_user, plan, datetime.utcnow().isoformat(), 0, expiry_date))
+    conn.commit()
+    conn.close()
+    
+    await update.message.reply_text(
+        f"✅ Code generated:\n"
+        f"User: {target_user}\n"
+        f"Plan: {plan}\n"
+        f"Code: `{tx_id}`\n"
+        f"Expires: {expiry_date[:10]} (1 day)\n\n"
+        f"User can verify with: /verifyid {tx_id}"
+    )
+
+# ====== User Self-Verify ======
+async def verifyid(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+
+    if len(context.args) < 1:
+        return await update.message.reply_text("Usage: /verifyid <transaction_code>")
+
+    tx_id = context.args[0]
+
+    if not re.match(r"^\d{5}$", tx_id):
+        return await update.message.reply_text("❌ Invalid transaction code. Must be exactly 5 digits.")
+
+    # Rate limiting
+    now = time.time()
+    if user_id not in verify_attempts:
+        verify_attempts[user_id] = []
+    verify_attempts[user_id] = [t for t in verify_attempts[user_id] if now - t < 600]
+    
+    if len(verify_attempts[user_id]) >= 5:
+        return await update.message.reply_text(
+            "❌ Too many attempts. Please wait 10 minutes and try again."
+        )
+    verify_attempts[user_id].append(now)
+
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT plan, expiry_date FROM transactions WHERE tx_id=? AND user_id=?", (tx_id, user_id))
+    row = c.fetchone()
+
+    if not row:
+        conn.close()
+        return await update.message.reply_text("❌ Transaction code not found or not assigned to you.")
+
+    plan, expiry_date = row
+    
+    if expiry_date and datetime.utcnow().isoformat() > expiry_date:
+        conn.close()
+        return await update.message.reply_text("❌ This transaction code has expired. Please contact admin.")
+
+    success = await auto_verify_payment(user_id, tx_id, plan, context.bot)
+    
+    if success:
+        await update.message.reply_text(
+            f"✅ Transaction {tx_id} verified.\n"
+            f"🎉 Your plan upgraded to {plan}."
+        )
+    else:
+        await update.message.reply_text("❌ Transaction code already used or error occurred.")
 
 # ====== Telegram Bot Command Handlers ======
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1202,7 +1198,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await update.message.reply_text(  # ✅ ဒီလိုပြင်ပါ (နေရာမှန်အောင်)
+    await update.message.reply_text(
         "🙏 မင်္ဂလာပါ။ ကျွန်တော် မစ္စတာသန်းပါ။\n"
         "သင့်ရဲ့ လက်ထောက် အဖြစ်နဲ့ ကိုယ်ရေးကိုယ်တာ၊ အလုပ်အကိုင်နဲ့ "
         "တခြားလုပ်ဆောင်ရမယ့် အရာတွေကို ယုံကြည်စွာ ဖြေရှင်းပေးဖို့ အသင့်ပါဗျ။\n\n"
@@ -1222,9 +1218,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📌 အသုံးပြုနည်း:\n/start - စတင်ရန်\n/help - အကူအညီ\n/subscribe - Plan ရွေးရန်\n/ask <q> - မေးရန်\n/status - အနေအထား\n/profile - ကိုယ်ရေးမှတ်တမ်း\n/habit - အလေ့အထ\n/referral - ဖိတ်ရန်\n\n"
+        "📌 အသုံးပြုနည်း:\n"
+        "/start - စတင်ရန်\n"
+        "/help - အကူအညီ\n"
+        "/subscribe - Plan ရွေးရန်\n"
+        "/ask <q> - မေးရန်\n"
+        "/status - အနေအထား\n"
+        "/profile - ကိုယ်ရေးမှတ်တမ်း\n"
+        "/habit - အလေ့အထ\n"
+        "/referral - ဖိတ်ရန်\n"
+        "/gen_code - Admin code generator\n"
+        "/verifyid - User self-verify\n\n"
         "🎯 ကျွန်တော် အကြံပေးနိုင်တဲ့ နယ်ပယ် ၁၂၀+ ခုရှိပါတယ်။"
-        "/referral - သင့် referral link ရယူရန်\n"
     )
 
 async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1246,6 +1251,7 @@ async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👑 **Premium+ (50,000 MMK)**\n\n"
         f"📌 မျှဝေပြီး အပိုသုံးခွင့်ရယူလိုက်ပါ!"
     )
+
 async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     plan = context.args[0] if context.args else "free"
@@ -1370,8 +1376,8 @@ async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if not check_limit(user_id):
-        keyboard = [[InlineKeyboardButton("⭐ Plan ရွေးရန်", callback_data="start_plan")]]  # ✅ ဒီနေရာမှာ
-        reply_markup = InlineKeyboardMarkup(keyboard)  # ✅ ဒီနေရာမှာ
+        keyboard = [[InlineKeyboardButton("⭐ Plan ရွေးရန်", callback_data="start_plan")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
             "❌ **သင့် Free Plan ၏ သုံးခွင့် ကုန်သွားပါပြီ။**\n\n"
             "🚀 ဆက်လက်သုံးစွဲရန် အောက်ပါ Plan များထဲမှ တစ်ခုကို ရွေးချယ်ပါ:\n"
@@ -1379,7 +1385,7 @@ async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "💎 **Premium (30,000 MMK)**\n"
             "👑 **Premium+ (50,000 MMK)**\n\n"
             "📸 ငွေလွှဲပြီး Proof ဓာတ်ပုံ ပို့ပေးပါ။",
-            reply_markup=reply_markup  # ✅ ဒီမှာ ထည့်ပါ
+            reply_markup=reply_markup
         )
         return
 
@@ -1404,7 +1410,6 @@ async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     increment_usage(user_id)
     await update.message.reply_text(answer, disable_web_page_preview=True)
-
 
 async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
@@ -1453,17 +1458,14 @@ async def sum_numbers(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Usage: /sum <စာရင်း သို့မဟုတ် ကိန်းဂဏန်းများ>")
         return
     text = " ".join(context.args)
-    # ကိန်းဂဏန်းတွေကို ရှာထုတ်မယ် (ဒသမကိန်းတွေပါ ထည့်သွင်းစဉ်းစားမယ်)
     numbers = re.findall(r'\d+(?:\.\d+)?', text)
     if not numbers:
         await update.message.reply_text("❌ ဂဏန်းတွေ မတွေ့ပါဘူး။")
         return
     total = sum(float(num) for num in numbers)
-    # ကိန်းပြည့်ဖြစ်ရင် .0 မပြဘဲ ပြမယ်
     if total.is_integer():
         total = int(total)
     await update.message.reply_text(f"🧮 ပေါင်းလဒ်စုစုပေါင်း = {total}")
-
 
 async def read_photo_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['photo_mode'] = 'read'
@@ -1474,11 +1476,10 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.photo:
         return
     
-    # User က /readphoto ခေါ်ထားရင် ဒီပုံကို ဖတ်ပါမယ်
     mode = context.user_data.get('photo_mode', 'proof')
     
     if mode == 'read':
-        context.user_data['photo_mode'] = 'proof' # ပြီးရင် ပုံမှန်အတိုင်း ပြန်ထားမယ်
+        context.user_data['photo_mode'] = 'proof'
         file = await context.bot.get_file(update.message.photo[-1].file_id)
         img_bytes = await file.download_as_bytearray()
         b64_image = base64.b64encode(img_bytes).decode('utf-8')
@@ -1512,7 +1513,6 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"⚠️ Error: {str(e)[:100]}")
         return
     
-    # ဒီအောက်က မူလ Proof System စနစ်ပါ (မပြောင်းပါ)
     file_id = update.message.photo[-1].file_id
     update_proof(user_id, file_id)
     await update.message.reply_text("✅ Proof screenshot ကို လက်ခံရရှိပြီးပါပြီ။ Admin က စစ်ဆေးပါမယ်။")
@@ -1526,12 +1526,10 @@ async def image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🎨 ပုံဖန်တီးနေပါတယ်... ခဏစောင့်ပါ...")
     
     try:
-        # Pollinations ကို ခေါ်မယ် (အခမဲ့)
         url = f"https://image.pollinations.ai/prompt/{prompt}"
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.get(url)
             if response.status_code == 200:
-                # Image ကို Telegram ကို ပို့ပေးမယ်
                 await update.message.reply_photo(photo=response.content)
             else:
                 await update.message.reply_text(f"❌ ပုံထုတ်လို့မရပါဘူး: {response.status_code}")
@@ -1580,7 +1578,6 @@ async def get_weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"🌍 {city} ရဲ့ ရာသီဥတုကို ရှာနေပါတယ်...")
 
     try:
-        # မြို့ကို Latitude/Longitude ပြောင်းမယ် (Open-Meteo Geocoding - Free)
         geo_res = await httpx.AsyncClient(timeout=10).get(
             f"https://geocoding-api.open-meteo.com/v1/search?name={city}&count=1&language=en&format=json"
         )
@@ -1593,7 +1590,6 @@ async def get_weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
         lon = geo_data["results"][0]["longitude"]
         place_name = geo_data["results"][0]["name"]
 
-        # ရာသီဥတု ဒေတာ ယူမယ် (Open-Meteo Weather API - Free)
         weather_res = await httpx.AsyncClient(timeout=10).get(
             f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
         )
@@ -1604,7 +1600,6 @@ async def get_weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
         wind_speed = current.get("windspeed")
         weather_code = current.get("weathercode")
 
-        # ရာသီဥတု အခြေအနေ ဘာသာပြန်မယ်
         conditions = {
             0: "သာယာနေပါတယ် ☀️", 1: "နည်းနည်းတိမ်ထူနေပါတယ် ⛅", 2: "တိမ်ထူနေပါတယ် ☁️", 3: "အုံ့ဆိုင်းနေပါတယ် 🌥️",
             45: "မြူဆိုင်းနေပါတယ် 🌫️", 51: "အလွန်နည်းသော မိုးစက်ကျနေပါတယ် 🌦️", 61: "မိုးရွာနေပါတယ် 🌧️",
@@ -1631,7 +1626,6 @@ async def text_to_speech(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔊 အသံဖိုင်ကို ဖန်တီးနေပါတယ်...")
 
     try:
-        # မြန်မာစာအတွက် lang='my' သုံးပါမယ်။ အင်္ဂလိပ်စာဆို lang='en' ပြောင်းပါ
         tts = gTTS(text=text, lang='my', slow=False)
         filename = "speech.mp3"
         tts.save(filename)
@@ -1643,7 +1637,6 @@ async def text_to_speech(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"⚠️ Error: {str(e)[:100]}")
 
 async def fetch_news(update: Update, context: ContextTypes.DEFAULT_TYPE, topic: str = None):
-    """Google News RSS ကနေ သတင်းတွေ ဆွဲထုတ်ပြီး ပြပေးမယ်"""
     await update.message.reply_text("📰 သတင်းတွေ ရှာနေပါတယ်... ခဏစောင့်ပါ...")
     try:
         if topic:
@@ -1656,7 +1649,7 @@ async def fetch_news(update: Update, context: ContextTypes.DEFAULT_TYPE, topic: 
             response.raise_for_status()
             root = ET.fromstring(response.text)
         
-        items = root.findall(".//item")[:10]  # ထိပ်ဆုံး ၁၀ ခု
+        items = root.findall(".//item")[:10]
         if not items:
             await update.message.reply_text("❌ သတင်းမတွေ့ပါဘူး။ နောက်တစ်ခါ ထပ်ကြိုးစားပါ။")
             return
@@ -1673,16 +1666,11 @@ async def fetch_news(update: Update, context: ContextTypes.DEFAULT_TYPE, topic: 
         await update.message.reply_text(f"⚠️ Error: {str(e)[:100]}")
 
 async def news_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # /news <topic> (ဥပမာ - /news technology)
     if context.args:
         topic = " ".join(context.args)
         await fetch_news(update, context, topic)
     else:
         await fetch_news(update, context)
-
-# main() ထဲမှာ ထည့်ရန်:
-# application.add_handler(CommandHandler("image", image))
-
 
 # ====== Admin Commands ======
 async def verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1817,7 +1805,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
             try:
                 short_prompt = f"Group chat ဖြစ်လို့ တိုတိုနဲ့ ဖြေပါ။ {text}"
-                answer = await ask_model(short_prompt, user_id)  # ✅ user_id ထည့်ပါ
+                answer = await ask_model(short_prompt, user_id)
                 answer = clean_text(answer)
             except Exception as e:
                 logger.error(f"Group message error: {e}")
@@ -1848,7 +1836,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
         await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
         try:
-            answer = await ask_model(text, user_id)  # ✅ user_id ထည့်ပါ
+            answer = await ask_model(text, user_id)
             answer = clean_text(answer)
         except Exception as e:
             logger.error(f"Handle message error: {e}")
@@ -1877,6 +1865,7 @@ def main():
     init_db()
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
+    # User Commands
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("subscribe", subscribe))
@@ -1894,13 +1883,19 @@ def main():
     application.add_handler(CommandHandler("readphoto", read_photo_command))
     application.add_handler(CommandHandler("image", image))
     application.add_handler(CommandHandler("news", news_command))
+    
+    # ✅ New Auto-Verify Commands
     application.add_handler(CommandHandler("gen_code", gen_code))      # Admin code generator
     application.add_handler(CommandHandler("verifyid", verifyid))      # User self-verify
+    
+    # Admin Commands
     application.add_handler(CommandHandler("verify", verify))
     application.add_handler(CommandHandler("pending_proofs", pending_proofs))
     application.add_handler(CommandHandler("approve_proof", approve_proof))
     application.add_handler(CommandHandler("reject_proof", reject_proof))
     application.add_handler(CommandHandler("broadcast", broadcast))
+    
+    # Callback & Message Handlers
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(MessageHandler(filters.PHOTO & (~filters.COMMAND), photo_handler))
     application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
@@ -1915,5 +1910,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-   
