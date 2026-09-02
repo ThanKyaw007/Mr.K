@@ -1455,6 +1455,7 @@ def main():
     application.add_handler(CommandHandler("proof", proof))
     application.add_handler(CommandHandler("referral", referral))
     application.add_handler(CommandHandler("sum", sum_numbers))
+    application.add_handler(CommandHandler("readphoto", read_photo_command))
     application.add_handler(CommandHandler("verify", verify))
     application.add_handler(CommandHandler("pending_proofs", pending_proofs))
     application.add_handler(CommandHandler("approve_proof", approve_proof))
