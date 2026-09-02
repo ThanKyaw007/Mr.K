@@ -615,33 +615,6 @@ def run_scheduler(bot):
         time.sleep(60)
 
 # ====== Telegram Bot Command Handlers ======
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    if context.args:
-        ref_code = context.args[0]
-        if ref_code.startswith("REF"):
-            inviter_id = ref_code.replace("REF", "")
-            if inviter_id != user_id:
-                give_referral_reward(inviter_id, user_id)
-    user = get_user(user_id)
-    if not user:
-        add_user(user_id, "free")
-    await update.message.reply_text(
-        "🙏 မင်္ဂလာပါ။ ကျွန်တော် မစ္စတာသန်းပါ။\n"
-        "သင့်ရဲ့ လက်ထောက် အဖြစ်နဲ့ ကိုယ်ရေးကိုယ်တာ၊ အလုပ်အကိုင်နဲ့ "
-        "တခြားလုပ်ဆောင်ရမယ့် အရာတွေကို ယုံကြည်စွာ ဖြေရှင်းပေးဖို့ အသင့်ပါဗျ။\n\n"
-        "Commands:\n"
-        "/subscribe <plan> - Plan ပြောင်းရန် (free/basic/premium/premium_plus)\n"
-        "/ask <question> - AI ကို မေးမြန်းရန်\n"
-        "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
-        "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n"
-        "/referral - သင့် referral link ရယူရန်\n"
-        "/profile <field> : <value> - Profile သိမ်းရန်\n"
-        "/habit <habit> - Habit ထည့်ရန်\n"
-        "/myhabits - သင့် habits စာရင်းကြည့်ရန်\n"
-        "/help - အကူအညီ\n\n"
-        "💡 သိကောင်းစရာ: အခမဲ့ သုံးချင်ရင် `/subscribe free` နှိပ်ပါ။"
-    )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -690,6 +663,18 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(query.from_user.id)
     data = query.data
 
+    # အသစ်ထည့်ထားတဲ့ Start Buttons အတွက် Logic
+    if data == "start_plan":
+        # Plan ရွေးတဲ့ UI ကို တိုက်ရိုက်ပြပေးမယ်
+        await subscribe(update, context)  # subscribe function ကို ခေါ်လိုက်တာ
+        return
+
+    if data == "start_help":
+        # Help Command ကို ပြပေးမယ်
+        await help_command(update, context)
+        return
+
+    # အောက်က မူရင်း Subscription Logic တွေ ဆက်လက်အလုပ်လုပ်နေမှာပါ
     if data.startswith("sub_"):
         plan = data.replace("sub_", "")
         if plan not in PLAN_LIMITS:
@@ -705,7 +690,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         price_mmk = PLAN_LIMITS[plan]["price"]
         price_usd = get_price_usd(price_mmk)
 
-        # ✅ ဒီမှာလည်း ကြိမ်အရေအတွက် မပါအောင် ဖြုတ်ပြီး ဈေးနှုန်းကိုပဲ ပြထားပါတယ်
         text = (
             f"📌 **{plan}** Plan ကို ရွေးလိုက်ပါပြီ။\n"
             f"💰 စျေးနှုန်း: {price_mmk:,} MMK (~${price_usd}) / month\n\n"
