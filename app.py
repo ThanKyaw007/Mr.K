@@ -900,22 +900,6 @@ system_prompt = (
 
 # ====== AI Model (DeepSeek First, GPT-4o-mini Fallback) ======
 async def ask_model(prompt: str, user_id: str = None) -> str:
-    for attempt in range(2):
-        try:
-            async with httpx.AsyncClient(timeout=30) as client:
-                response = await client.post(
-                    OPENROUTER_URL,
-                    headers={...},
-                    json={...}
-                )
-                # ... (result processing)
-                return final_answer
-        except Exception as e:
-            if attempt == 1:
-                logger.error(f"DeepSeek failed: {e}. Falling back to GPT-4o-mini.")
-                break
-            await asyncio.sleep(2 ** attempt)  # ✅ exponential backoff
-    # ... (fallback to GPT-4o-mini)
     user_context = ""
     cache_allowed = True
     cache_key = f"{prompt.strip()}|{user_id}"
@@ -940,14 +924,25 @@ async def ask_model(prompt: str, user_id: str = None) -> str:
         if cached:
             return cached
 
-    # DeepSeek Retry
+    # DeepSeek Retry with exponential backoff
     for attempt in range(2):
         try:
             async with httpx.AsyncClient(timeout=30) as client:
                 response = await client.post(
                     OPENROUTER_URL,
-                    headers={"Authorization": f"Bearer {OPENROUTER_API_KEY.strip()}", "Content-Type": "application/json"},
-                    json={"model": "deepseek-chat", "messages": [{"role": "system", "content": system_prompt + user_context}, {"role": "user", "content": prompt}], "max_tokens": 800, "temperature": 0.85},
+                    headers={
+                        "Authorization": f"Bearer {OPENROUTER_API_KEY.strip()}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": "deepseek-chat",
+                        "messages": [
+                            {"role": "system", "content": system_prompt + user_context},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "max_tokens": 800,
+                        "temperature": 0.85
+                    },
                 )
                 result = response.json()
                 if "choices" in result and len(result["choices"]) > 0:
@@ -963,7 +958,7 @@ async def ask_model(prompt: str, user_id: str = None) -> str:
             if attempt == 1:
                 logger.error(f"DeepSeek failed: {e}. Falling back to GPT-4o-mini.")
                 break
-            await asyncio.sleep(1)
+            await asyncio.sleep(2 ** attempt)  # exponential backoff
 
     # GPT-4o-mini Retry
     for attempt in range(2):
@@ -971,8 +966,19 @@ async def ask_model(prompt: str, user_id: str = None) -> str:
             async with httpx.AsyncClient(timeout=30) as client:
                 response = await client.post(
                     OPENROUTER_URL,
-                    headers={"Authorization": f"Bearer {OPENROUTER_API_KEY.strip()}", "Content-Type": "application/json"},
-                    json={"model": "gpt-4o-mini", "messages": [{"role": "system", "content": system_prompt + user_context}, {"role": "user", "content": prompt}], "max_tokens": 800, "temperature": 0.85},
+                    headers={
+                        "Authorization": f"Bearer {OPENROUTER_API_KEY.strip()}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": "gpt-4o-mini",
+                        "messages": [
+                            {"role": "system", "content": system_prompt + user_context},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "max_tokens": 800,
+                        "temperature": 0.85
+                    },
                 )
                 result = response.json()
                 if "choices" in result and len(result["choices"]) > 0:
@@ -987,13 +993,13 @@ async def ask_model(prompt: str, user_id: str = None) -> str:
         except Exception as e:
             if attempt == 1:
                 raise e
-            await asyncio.sleep(1)
+            await asyncio.sleep(2 ** attempt)
 
 async def send_daily_coaching(bot):
     try:
         conn = sqlite3.connect("bot_users.db", check_same_thread=False)
         c = conn.cursor()
-         c.execute("SELECT user_id FROM users WHERE plan IN ('free', 'premium_plus')")
+        c.execute("SELECT user_id FROM users WHERE plan IN ('free', 'premium_plus')")  # ✅ ဒီလိုပြင်ပါ
         users = c.fetchall()
         conn.close()
 
@@ -1021,27 +1027,18 @@ async def send_daily_coaching(bot):
 def run_scheduler(bot):
     schedule.every(30).days.do(reset_usage)
     
-    # ✅ ဒီအပိုင်းကို ထည့်ပါ (Myanmar Timezone)
+    # မြန်မာအချိန် အတွက်
     mm_tz = pytz.timezone("Asia/Yangon")
+    now_mm = datetime.now(mm_tz)
     
-    schedule.every().day.at("08:00").do(lambda: asyncio.run(send_daily_coaching(bot)))
-    schedule.every().day.at("03:00").do(lambda: backup_and_send(bot))
+    schedule.every().day.at("08:00").do(lambda: asyncio.create_task(send_daily_coaching(bot)))  # Myanmar 8AM
+    schedule.every().day.at("03:00").do(lambda: backup_and_send(bot))  # Myanmar 3AM
     
     logger.info("⏰ Scheduler started (Myanmar Time).")
     while True:
         schedule.run_pending()
         time.sleep(60)
-    
-def run_scheduler(bot):
-    schedule.every(30).days.do(reset_usage)
-    # မြန်မာအချိန် မနက် ၈ နာရီ = UTC မနက် ၁ နာရီခွဲ (01:30)
-    schedule.every().day.at("01:30").do(lambda: asyncio.run(send_daily_coaching(bot)))
-    # မြန်မာအချိန် မနက် ၃ နာရီ = UTC ညနေ ၈ နာရီခွဲ (20:30)
-    schedule.every().day.at("20:30").do(lambda: backup_and_send(bot))
-    logger.info("⏰ Scheduler started (Myanmar Time UTC+6:30).")
-    while True:
-        schedule.run_pending()
-        time.sleep(60)
+
 
 # ====== Telegram Bot Command Handlers ======
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1063,7 +1060,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-   await update.message.reply_text(
+    await update.message.reply_text(  # ✅ ဒီလိုပြင်ပါ (နေရာမှန်အောင်)
         "🙏 မင်္ဂလာပါ။ ကျွန်တော် မစ္စတာသန်းပါ။\n"
         "သင့်ရဲ့ လက်ထောက် အဖြစ်နဲ့ ကိုယ်ရေးကိုယ်တာ၊ အလုပ်အကိုင်နဲ့ "
         "တခြားလုပ်ဆောင်ရမယ့် အရာတွေကို ယုံကြည်စွာ ဖြေရှင်းပေးဖို့ အသင့်ပါဗျ။\n\n"
@@ -1072,12 +1069,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/ask <question> - AI ကို မေးမြန်းရန်\n"
         "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
         "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n"
-        "/referral - သင့် referral link ရယူရန်\n"   # 👈 ဒီမှာ ထည့်ပါ
+        "/referral - သင့် referral link ရယူရန်\n"
         "/profile <field> : <value> - Profile သိမ်းရန်\n"
         "/habit <habit> - Habit ထည့်ရန်\n"
         "/myhabits - သင့် habits စာရင်းကြည့်ရန်\n"
         "/help - အကူအညီ\n\n"
-        "💡 သိကောင်းစရာ: အခမဲ့ သုံးချင်ရင် `/subscribe free` နှိပ်ပါ။"
+        "💡 သိကောင်းစရာ: အခမဲ့ သုံးချင်ရင် `/subscribe free` နှိပ်ပါ။",
+        reply_markup=reply_markup
     )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1230,7 +1228,8 @@ async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if not check_limit(user_id):
-                keyboard = [[InlineKeyboardButton("⭐ Plan ရွေးရန်", callback_data="start_plan")]]
+        keyboard = [[InlineKeyboardButton("⭐ Plan ရွေးရန်", callback_data="start_plan")]]  # ✅ ဒီနေရာမှာ
+        reply_markup = InlineKeyboardMarkup(keyboard)  # ✅ ဒီနေရာမှာ
         await update.message.reply_text(
             "❌ **သင့် Free Plan ၏ သုံးခွင့် ကုန်သွားပါပြီ။**\n\n"
             "🚀 ဆက်လက်သုံးစွဲရန် အောက်ပါ Plan များထဲမှ တစ်ခုကို ရွေးချယ်ပါ:\n"
@@ -1238,7 +1237,7 @@ async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "💎 **Premium (30,000 MMK)**\n"
             "👑 **Premium+ (50,000 MMK)**\n\n"
             "📸 ငွေလွှဲပြီး Proof ဓာတ်ပုံ ပို့ပေးပါ။",
-            reply_markup=keyboard
+            reply_markup=reply_markup  # ✅ ဒီမှာ ထည့်ပါ
         )
         return
 
@@ -1263,6 +1262,7 @@ async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     increment_usage(user_id)
     await update.message.reply_text(answer, disable_web_page_preview=True)
+
 
 async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
