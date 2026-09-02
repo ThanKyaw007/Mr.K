@@ -10,6 +10,7 @@ import logging
 import schedule
 import time
 from datetime import datetime
+from difflib import SequenceMatcher
 from flask import Flask, request, Response, send_file
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -32,9 +33,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ====== Configuration ======
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or "8617869426:AAHzomx_Uikd_S69UxCGAp4avOWUx6ytqVM"
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY") or "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"
+# ====== Configuration (Security: env variables with fallback) ======
+TELEGRAM_BOT_TOKEN = os.environ.get("BOT_TOKEN") or "8617869426:AAHzomx_Uikd_S69UxCGAp4avOWUx6ytqVM"
+OPENROUTER_API_KEY = os.environ.get("OR_KEY") or "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"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 ADMIN_IDS = [1119128553]
@@ -99,7 +100,7 @@ def health():
 @flask_app.route("/admin/proofs")
 @requires_auth
 def admin_proofs():
-    conn = sqlite3.connect("bot_users.db")
+    conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
     c.execute("SELECT user_id, plan, usage_count, proof_status, proof_file_id FROM users")
     results = c.fetchall()
@@ -127,7 +128,7 @@ def admin_proofs():
 @flask_app.route("/admin/users")
 @requires_auth
 def admin_users():
-    conn = sqlite3.connect("bot_users.db")
+    conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
     c.execute("SELECT user_id, plan, usage_count, proof_status FROM users ORDER BY user_id")
     results = c.fetchall()
@@ -145,7 +146,7 @@ def admin_users():
 @flask_app.route("/admin/stats")
 @requires_auth
 def admin_stats():
-    conn = sqlite3.connect("bot_users.db")
+    conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM users")
     total_users = c.fetchone()[0]
@@ -202,7 +203,7 @@ def download_db():
 @flask_app.route("/admin/approve/<user_id>")
 @requires_auth
 def approve_user(user_id):
-    conn = sqlite3.connect("bot_users.db")
+    conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
     c.execute("SELECT plan FROM users WHERE user_id=? AND proof_status='pending'", (user_id,))
     result = c.fetchone()
@@ -222,7 +223,7 @@ def approve_user(user_id):
 @flask_app.route("/admin/reject/<user_id>")
 @requires_auth
 def reject_user(user_id):
-    conn = sqlite3.connect("bot_users.db")
+    conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
     c.execute(
         "UPDATE users SET proof_status='rejected' WHERE user_id=? AND proof_status='pending'",
@@ -253,7 +254,7 @@ def clean_text(text):
 # ====== Database Backup Function ======
 def backup_and_send(bot):
     try:
-        conn = sqlite3.connect("bot_users.db")
+        conn = sqlite3.connect("bot_users.db", check_same_thread=False)
         with open("bot_users_backup.db", "w", encoding='utf-8') as f:
             for line in conn.iterdump():
                 f.write(f"{line}\n")
@@ -273,7 +274,7 @@ def backup_and_send(bot):
 
 # ====== Database Functions ======
 def init_db():
-    conn = sqlite3.connect("bot_users.db")
+    conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
     c.execute("""CREATE TABLE IF NOT EXISTS users (
         user_id TEXT PRIMARY KEY,
@@ -311,7 +312,7 @@ def init_db():
     conn.close()
 
 def add_user(user_id, plan="free"):
-    conn = sqlite3.connect("bot_users.db")
+    conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
     price = PLAN_LIMITS[plan]["price"]
     c.execute("""INSERT OR REPLACE INTO users (user_id, plan, usage_count, proof_status, proof_file_id, price, proof_timestamp, goals, weaknesses, dream, career, money_mindset, relationship, birthdate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (user_id, plan, 0, "none", None, price, None, None, None, None, None, None, None, None))
@@ -319,23 +320,22 @@ def add_user(user_id, plan="free"):
     conn.close()
 
 def get_user(user_id):
-    conn = sqlite3.connect("bot_users.db")
+    conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
-    # 👇 ဒီထဲမှာ birthdate ထည့်ပြီးသား ဖြစ်အောင် ကူးထည့်ပါ
     c.execute("SELECT plan, usage_count, proof_status, proof_file_id, price, proof_timestamp, goals, weaknesses, dream, career, money_mindset, relationship, birthdate FROM users WHERE user_id=?", (user_id,))
     result = c.fetchone()
     conn.close()
     return result
 
 def update_profile(user_id, field, value):
-    conn = sqlite3.connect("bot_users.db")
+    conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
     c.execute(f"UPDATE users SET {field}=? WHERE user_id=?", (value, user_id))
     conn.commit()
     conn.close()
 
 def update_proof(user_id, file_id):
-    conn = sqlite3.connect("bot_users.db")
+    conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
     c.execute("UPDATE users SET proof_file_id=?, proof_status='pending', proof_timestamp=? WHERE user_id=?", (file_id, datetime.utcnow().isoformat(), user_id))
     conn.commit()
@@ -353,7 +353,7 @@ def check_limit(user_id):
     return True
 
 def increment_usage(user_id):
-    conn = sqlite3.connect("bot_users.db")
+    conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
     c.execute("UPDATE users SET usage_count = usage_count + 1 WHERE user_id=?", (user_id,))
     conn.commit()
@@ -365,7 +365,7 @@ def generate_ref_code(user_id):
 
 def give_referral_reward(inviter_id, invited_id):
     try:
-        conn = sqlite3.connect("bot_users.db")
+        conn = sqlite3.connect("bot_users.db", check_same_thread=False)
         c = conn.cursor()
         c.execute("SELECT usage_count FROM users WHERE user_id=?", (inviter_id,))
         row = c.fetchone()
@@ -384,7 +384,7 @@ def give_referral_reward(inviter_id, invited_id):
         logger.error(f"❌ Referral reward error: {e}")
 
 def get_referral_count(user_id):
-    conn = sqlite3.connect("bot_users.db")
+    conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM referrals WHERE inviter_id=?", (user_id,))
     count = c.fetchone()[0]
@@ -393,14 +393,14 @@ def get_referral_count(user_id):
 
 # ====== Habits ======
 def add_habit(user_id, habit_text):
-    conn = sqlite3.connect("bot_users.db")
+    conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
     c.execute("INSERT INTO habits (user_id, habit, created_at) VALUES (?, ?, ?)", (user_id, habit_text, datetime.utcnow().isoformat()))
     conn.commit()
     conn.close()
 
 def get_habits(user_id):
-    conn = sqlite3.connect("bot_users.db")
+    conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
     c.execute("SELECT habit, created_at FROM habits WHERE user_id=? ORDER BY created_at DESC LIMIT 20", (user_id,))
     results = c.fetchall()
@@ -409,7 +409,7 @@ def get_habits(user_id):
 
 def reset_usage():
     try:
-        conn = sqlite3.connect("bot_users.db")
+        conn = sqlite3.connect("bot_users.db", check_same_thread=False)
         c = conn.cursor()
         c.execute("UPDATE users SET usage_count = 0")
         conn.commit()
@@ -418,9 +418,9 @@ def reset_usage():
     except Exception as e:
         logger.error(f"❌ Usage reset error: {e}")
 
-# ====== Response Cache (ပိုက်ဆံချွေတာရန်) ======
+# ====== Response Cache ======
 def get_cached_response(query: str):
-    conn = sqlite3.connect("bot_users.db")
+    conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
     c.execute("SELECT response FROM response_cache WHERE query=?", (query,))
     result = c.fetchone()
@@ -428,7 +428,7 @@ def get_cached_response(query: str):
     return result[0] if result else None
 
 def save_cached_response(query: str, response: str):
-    conn = sqlite3.connect("bot_users.db")
+    conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
     c.execute(
         "INSERT OR REPLACE INTO response_cache (query, response, created_at) VALUES (?, ?, ?)",
@@ -436,7 +436,17 @@ def save_cached_response(query: str, response: str):
     )
     conn.commit()
     conn.close()
-    
+
+# ====== Fuzzy Matching Helpers ======
+def normalize_text(text: str) -> str:
+    text = text.lower()
+    text = re.sub(r"[^\u1000-\u109F0-9a-zA-Z\s]", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+def fuzzy_score(a: str, b: str) -> float:
+    return SequenceMatcher(None, a, b).ratio()
+
 # ====== Local Responses (ပိုက်ဆံချွေတာရန်) ======
 LOCAL_RESPONSES = {
     "hello": "ဟယ်လို! မင်္ဂလာပါဗျ။ ဘာကူညီပေးရမလဲ?",
@@ -711,16 +721,38 @@ LOCAL_RESPONSES = {
     "တရုတ်စာ": "တရုတ်စကားပြောနှင့် တရုတ်ဘာသာပြန်ခြင်းအတွက် /ask မှာ မေးပါ။",
 }
 
-def get_local_response(user_text):
+# ====== Optimized Local Response Function ======
+def get_local_response(user_text: str) -> str | None:
     if not user_text:
         return None
-    text = user_text.lower().strip()
-    for key, value in LOCAL_RESPONSES.items():
-        if key in text:
-            return value
+
+    # 1) Exact key match (O(1))
+    text_raw = user_text.strip()
+    text_lower = text_raw.lower()
+    if text_lower in LOCAL_RESPONSES:
+        return LOCAL_RESPONSES[text_lower]
+
+    # 2) Normalized exact match (still O(1))
+    norm = normalize_text(text_raw)
+    if norm in LOCAL_RESPONSES:
+        return LOCAL_RESPONSES[norm]
+
+    # 3) Fuzzy match (O(N) but N is small & fast)
+    best_key = None
+    best_score = 0.0
+    for key in LOCAL_RESPONSES.keys():
+        score = fuzzy_score(norm, normalize_text(key))
+        if score > best_score:
+            best_score = score
+            best_key = key
+
+    # 4) Threshold to avoid nonsense matches
+    if best_score >= 0.75 and best_key:
+        return LOCAL_RESPONSES[best_key]
+
     return None
 
-# ====== Daily Coaching & System Prompt (66 Domains) ======
+# ====== Daily Coaching & System Prompt (120+ Domains) ======
 system_prompt = (
     "သင်ဟာ မစ္စတာသန်း (Mr.T) — funny, friendly, motivational AI Bot ဖြစ်ပါတယ်။\n"
     "မြန်မာပြည်က လူတွေအတွက် အကောင်းဆုံး ဘဝအကြံပေး၊ နည်းပညာရှင်၊ စီးပွားရေးလမ်းညွှန်နဲ့ နေ့စဉ်ပြဿနာဖြေရှင်းပေးသူ ဖြစ်ပါတယ်။\n\n"
@@ -805,18 +837,17 @@ system_prompt = (
     "အဖြေတွေကို မြန်မာလိုပဲ ပြန်ရမယ်။ လေးလေးနက်နက်၊ ရယ်စရာ၊ မိတ်ဆွေလို ပြောရမယ်။\n"
     "ဥပဒေ၊ ကျန်းမာရေး၊ ငွေကြေးဆိုင်ရာ အကြံပြုချက်များသည် အထွေထွေ အချက်အလက်သာဖြစ်ပြီး ကျွမ်းကျင်သူများနှင့် တိုင်ပင်ရန် သတိပေးရမယ်။"
 )
+
 # ====== AI Model (DeepSeek First, GPT-4o-mini Fallback) ======
 async def ask_model(prompt: str, user_id: str = None) -> str:
     user_context = ""
-    cache_allowed = True  # Cache ကို ခွင့်ပြုမလား
+    cache_allowed = True
+    cache_key = f"{prompt.strip()}|{user_id}"
 
     if user_id:
         user_data = get_user(user_id)
         if user_data:
-            # 👇 ဒီမှာ (၁၃) ခုနဲ့ ဖြေရှင်းပါ (birthdate ထည့်ပြီး)
             (plan, usage, proof_status, _, _, _, goals, weaknesses, dream, career, money_mindset, relationship, birthdate) = user_data
-            
-            # Profile မှာ ဒေတာတွေ ရှိနေရင် Cache မသုံးပါနဲ့ (သူ့အတွက် သီးသန့်ဖြေရမလို့)
             if any([goals, weaknesses, dream, career, money_mindset, relationship, birthdate]):
                 cache_allowed = False
                 user_context = "\n\n[အသုံးပြုသူ၏ ကိုယ်ရေးအချက်အလက်များ]\n"
@@ -828,56 +859,63 @@ async def ask_model(prompt: str, user_id: str = None) -> str:
                 if relationship: user_context += f"- ဆက်ဆံရေး: {relationship}\n"
                 if birthdate: user_context += f"- မွေးနေ့: {birthdate}\n"
 
-    # Cache ထဲ အရင်ရှာမယ် (Profile မရှိရင်သာ)
     if cache_allowed:
-        cached = get_cached_response(prompt)
+        cached = get_cached_response(cache_key)
         if cached:
             return cached
 
-    # DeepSeek ကို စမ်းမယ်
-    try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.post(
-                OPENROUTER_URL,
-                headers={"Authorization": f"Bearer {OPENROUTER_API_KEY.strip()}", "Content-Type": "application/json"},
-                json={"model": "deepseek-chat", "messages": [{"role": "system", "content": system_prompt + user_context}, {"role": "user", "content": prompt}], "max_tokens": 800, "temperature": 0.85},
-            )
-            result = response.json()
-            if "choices" in result and len(result["choices"]) > 0:
-                final_answer = result["choices"][0]["message"]["content"].strip()
-                # အဖြေရပြီဆိုရင် Cache ထဲ သိမ်းမယ် (Profile မရှိရင်သာ)
-                if cache_allowed:
-                    save_cached_response(prompt, final_answer)
-                return final_answer
-            elif "error" in result:
-                raise Exception(result["error"]["message"])
-            else:
-                raise Exception("Unexpected API response: " + str(result))
-    except Exception as e:
-        logger.error(f"DeepSeek failed: {e}. Falling back to GPT-4o-mini.")
-        
-        # GPT-4o-mini ကို ပြန်ခေါ်မယ် (Fallback)
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.post(
-                OPENROUTER_URL,
-                headers={"Authorization": f"Bearer {OPENROUTER_API_KEY.strip()}", "Content-Type": "application/json"},
-                json={"model": "gpt-4o-mini", "messages": [{"role": "system", "content": system_prompt + user_context}, {"role": "user", "content": prompt}], "max_tokens": 800, "temperature": 0.85},
-            )
-            result = response.json()
-            if "choices" in result and len(result["choices"]) > 0:
-                final_answer = result["choices"][0]["message"]["content"].strip()
-                # အဖြေရပြီဆိုရင် Cache ထဲ သိမ်းမယ် (Profile မရှိရင်သာ)
-                if cache_allowed:
-                    save_cached_response(prompt, final_answer)
-                return final_answer
-            elif "error" in result:
-                raise Exception(result["error"]["message"])
-            else:
-                raise Exception("Unexpected API response: " + str(result))
+    # DeepSeek Retry
+    for attempt in range(2):
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await client.post(
+                    OPENROUTER_URL,
+                    headers={"Authorization": f"Bearer {OPENROUTER_API_KEY.strip()}", "Content-Type": "application/json"},
+                    json={"model": "deepseek-chat", "messages": [{"role": "system", "content": system_prompt + user_context}, {"role": "user", "content": prompt}], "max_tokens": 800, "temperature": 0.85},
+                )
+                result = response.json()
+                if "choices" in result and len(result["choices"]) > 0:
+                    final_answer = result["choices"][0]["message"]["content"].strip()
+                    if cache_allowed:
+                        save_cached_response(cache_key, final_answer)
+                    return final_answer
+                elif "error" in result:
+                    raise Exception(result["error"]["message"])
+                else:
+                    raise Exception("Unexpected API response: " + str(result))
+        except Exception as e:
+            if attempt == 1:
+                logger.error(f"DeepSeek failed: {e}. Falling back to GPT-4o-mini.")
+                break
+            await asyncio.sleep(1)
+
+    # GPT-4o-mini Retry
+    for attempt in range(2):
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await client.post(
+                    OPENROUTER_URL,
+                    headers={"Authorization": f"Bearer {OPENROUTER_API_KEY.strip()}", "Content-Type": "application/json"},
+                    json={"model": "gpt-4o-mini", "messages": [{"role": "system", "content": system_prompt + user_context}, {"role": "user", "content": prompt}], "max_tokens": 800, "temperature": 0.85},
+                )
+                result = response.json()
+                if "choices" in result and len(result["choices"]) > 0:
+                    final_answer = result["choices"][0]["message"]["content"].strip()
+                    if cache_allowed:
+                        save_cached_response(cache_key, final_answer)
+                    return final_answer
+                elif "error" in result:
+                    raise Exception(result["error"]["message"])
+                else:
+                    raise Exception("Unexpected API response: " + str(result))
+        except Exception as e:
+            if attempt == 1:
+                raise e
+            await asyncio.sleep(1)
 
 async def send_daily_coaching(bot):
     try:
-        conn = sqlite3.connect("bot_users.db")
+        conn = sqlite3.connect("bot_users.db", check_same_thread=False)
         c = conn.cursor()
         c.execute("SELECT user_id FROM users WHERE plan IN ('free', 'premium_plus')")
         users = c.fetchall()
@@ -914,7 +952,6 @@ def run_scheduler(bot):
         time.sleep(60)
 
 # ====== Telegram Bot Command Handlers ======
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     if context.args:
@@ -928,7 +965,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user:
         add_user(user_id, "free")
 
-    # Button နှစ်ခု ထည့်ထားပါတယ်
     keyboard = [
         [InlineKeyboardButton("📌 Plan ရွေးရန် (စတင်ရန်)", callback_data="start_plan")],
         [InlineKeyboardButton("ℹ️ လမ်းညွှန်ချက်များ (Help)", callback_data="start_help")]
@@ -942,7 +978,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🚀 စတင်အသုံးပြုရန် အောက်ပါခလုတ်ကို နှိပ်ပါ။",
         reply_markup=reply_markup
     )
-    
+
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "📌 အသုံးပြုနည်း:\n/start - စတင်ရန်\n/help - အကူအညီ\n/subscribe - Plan ရွေးရန်\n/ask <q> - မေးရန်\n/status - အနေအထား\n/profile - ကိုယ်ရေးမှတ်တမ်း\n/habit - အလေ့အထ\n/referral - ဖိတ်ရန်\n\n"
@@ -960,13 +996,11 @@ async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     plan = context.args[0] if context.args else "free"
-
     if plan not in PLAN_LIMITS:
         allowed = ", ".join(PLAN_LIMITS.keys())
         await update.message.reply_text(f"❌ '{plan}' မရှိပါ။ ရနိုင်တဲ့ Plan: {allowed}")
         return
 
-    # ✅ ဒီနေရာမှာ ကြိမ်အရေအတွက်တွေ ဖြုတ်ပြီး Plan နဲ့ ဈေးနှုန်းကိုပဲ ပြထားပါတယ်
     keyboard = [
         [InlineKeyboardButton("📌 Free (အခမဲ့)", callback_data="sub_free")],
         [InlineKeyboardButton("⭐ Basic (10,000 MMK)", callback_data="sub_basic")],
@@ -990,9 +1024,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(query.from_user.id)
     data = query.data
 
-    # အသစ်ထည့်ထားတဲ့ Start Buttons အတွက် Logic
     if data == "start_plan":
-        # Plan ရွေးတဲ့ UI ကို တိုက်ရိုက်ပြပေးမယ်
         keyboard = [
             [InlineKeyboardButton("📌 Free (အခမဲ့)", callback_data="sub_free")],
             [InlineKeyboardButton("⭐ Basic (10,000 MMK)", callback_data="sub_basic")],
@@ -1011,7 +1043,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "start_help":
-        # Help Command ကို ပြပေးမယ်
         await query.edit_message_text(
             "📌 အသုံးပြုနည်း:\n"
             "/start - စတင်ရန်\n"
@@ -1026,14 +1057,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # အောက်က မူရင်း Subscription Logic တွေ ဆက်လက်အလုပ်လုပ်နေမှာပါ
     if data.startswith("sub_"):
         plan = data.replace("sub_", "")
         if plan not in PLAN_LIMITS:
             await query.edit_message_text("❌ Invalid plan.")
             return
 
-        conn = sqlite3.connect("bot_users.db")
+        conn = sqlite3.connect("bot_users.db", check_same_thread=False)
         c = conn.cursor()
         c.execute("UPDATE users SET plan=?, proof_status='waiting', price=? WHERE user_id=?", (plan, PLAN_LIMITS[plan]["price"], user_id))
         conn.commit()
@@ -1055,8 +1085,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(user_id)
     if not user:
         add_user(user_id, "free")
-        user = ("free", 0, "none", None, 0, None, None, None, None, None, None, None, None) # ၁၃ ခု ထည့်ပါ
-    # 👇 ဒီလိုင်းကို ဒီအတိုင်း ပြင်ပါ (birthdate ပါအောင်)
+        user = ("free", 0, "none", None, 0, None, None, None, None, None, None, None, None)
     (plan, usage, proof_status, _, price, _, goals, weaknesses, dream, career, money_mindset, relationship, birthdate) = user
     limit = PLAN_LIMITS[plan]["limit"]
     remaining = limit - usage
@@ -1065,7 +1094,6 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     level = usage // 100 + 1
     level_title = "🥉 Bronze" if level == 1 else "🥈 Silver" if level == 2 else "🥇 Gold" if level >= 3 else "🌱 Beginner"
     
-    # (အောက်က မူရင်း code တွေ ဆက်သွားပါ)
     profile_preview = ""
     if goals: profile_preview += f"\n• 🎯 Goals: {goals}"
     if career: profile_preview += f"\n• 💼 Career: {career}"
@@ -1073,13 +1101,13 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if dream: profile_preview += f"\n• 🌟 Dream: {dream}"
     if weaknesses: profile_preview += f"\n• ⚠️ Weaknesses: {weaknesses}"
     if relationship: profile_preview += f"\n• ❤️ Relationship: {relationship}"
-    if birthdate: profile_preview += f"\n• 🎂 Birthdate: {birthdate}" # ဗေဒင်အတွက် ထည့်ပါ
+    if birthdate: profile_preview += f"\n• 🎂 Birthdate: {birthdate}"
     await update.message.reply_text(f"📊 **Your Status**\n🏅 Level: {level_title} (Lv.{level})\n📌 Plan: **{plan}**\n📈 Usage: {usage}/{limit}\n🔋 Remaining: **{remaining}**\n🔍 Proof Status: {proof_status}\n👥 Referrals: **{ref_count}**{profile_preview}")
+
 async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     chat_type = update.effective_chat.type
-    
-    # Group ထဲမှာ သုံးရင် ညွှန်ကြားချက် ပြန်ပေး (Privacy & Cost သက်သာစေရန်)
+
     if chat_type in ["group", "supergroup"]:
         await update.message.reply_text(
             "⚠️ /ask command ကို Group ထဲမှာ တိုက်ရိုက်မသုံးပါနဲ့ဗျာ။\n"
@@ -1117,18 +1145,19 @@ async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     if not context.args:
-        await update.message.reply_text("Usage: /profile <field> : <value>\nExample: /profile goals : ကိုယ်ပိုင်လုပ်ငန်းဖွင့်မယ်\nAllowed fields: goals, weaknesses, dream, career, money_mindset, relationship,birthdate")
+        await update.message.reply_text("Usage: /profile <field> : <value>\nExample: /profile goals : ကိုယ်ပိုင်လုပ်ငန်းဖွင့်မယ်\nAllowed fields: goals, weaknesses, dream, career, money_mindset, relationship, birthdate")
         return
     text = " ".join(context.args)
     if ":" not in text:
         await update.message.reply_text("❌ Format: field : value")
         return
     field_raw, value = [p.strip() for p in text.split(":", 1)]
-    field_map = {"goals": "goals", "weaknesses": "weaknesses", "dream": "dream", "career": "career", "money_mindset": "money_mindset", "relationship": "relationship", "birthdate": "birthdate",}
-    key = field_map.get(field_raw)
-    if not key:
-        await update.message.reply_text("❌ field မမှန်ပါ။ goals/weaknesses/dream/career/money_mindset/relationship/birthdate ထဲက တစ်ခုသုံးပါ။")
+    allowed_fields = ["goals", "weaknesses", "dream", "career", "money_mindset", "relationship", "birthdate"]
+    if field_raw not in allowed_fields:
+        await update.message.reply_text("❌ field မမှန်ပါ။ ခွင့်ပြုထားတဲ့ field တွေသာ ထည့်ပါ။")
         return
+    field_map = {"goals": "goals", "weaknesses": "weaknesses", "dream": "dream", "career": "career", "money_mindset": "money_mindset", "relationship": "relationship", "birthdate": "birthdate"}
+    key = field_map.get(field_raw)
     update_profile(user_id, key, value)
     await update.message.reply_text(f"✅ `{key}` ကို update လုပ်ပြီးပါပြီ။")
 
@@ -1176,7 +1205,7 @@ async def verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if plan not in PLAN_LIMITS:
         await update.message.reply_text("❌ Invalid plan.")
         return
-    conn = sqlite3.connect("bot_users.db")
+    conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
     c.execute("UPDATE users SET plan=?, proof_status='approved', price=? WHERE user_id=?", (plan, PLAN_LIMITS[plan]["price"], target_id))
     conn.commit()
@@ -1188,7 +1217,7 @@ async def pending_proofs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id not in [str(a) for a in ADMIN_IDS]:
         await update.message.reply_text("❌ Admin only.")
         return
-    conn = sqlite3.connect("bot_users.db")
+    conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
     c.execute("SELECT user_id, plan, proof_file_id, proof_timestamp FROM users WHERE proof_status='pending'")
     rows = c.fetchall()
@@ -1210,7 +1239,7 @@ async def approve_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Usage: /approve_proof <user_id>")
         return
     target_id = context.args[0]
-    conn = sqlite3.connect("bot_users.db")
+    conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
     c.execute("SELECT plan FROM users WHERE user_id=?", (target_id,))
     row = c.fetchone()
@@ -1234,7 +1263,7 @@ async def reject_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Usage: /reject_proof <user_id>")
         return
     target_id = context.args[0]
-    conn = sqlite3.connect("bot_users.db")
+    conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
     c.execute("UPDATE users SET proof_status='rejected' WHERE user_id=?", (target_id,))
     conn.commit()
@@ -1250,7 +1279,7 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Usage: /broadcast <message>")
         return
     message = " ".join(context.args)
-    conn = sqlite3.connect("bot_users.db")
+    conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
     c.execute("SELECT user_id FROM users")
     users = c.fetchall()
@@ -1299,7 +1328,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
             await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
             try:
-                answer = await ask_model(text, user_id)
+                short_prompt = f"Group chat ဖြစ်လို့ တိုတိုနဲ့ ဖြေပါ။ {text}"
+                answer = await ask_model(short_prompt, user_id)
                 answer = clean_text(answer)
             except Exception as e:
                 logger.error(f"Group message error: {e}")
