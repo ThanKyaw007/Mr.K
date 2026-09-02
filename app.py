@@ -1312,9 +1312,9 @@ async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🎁 **ရမည့်အခွင့်အရေး:**\n"
         f"👉 သူငယ်ချင်းတစ်ယောက် ဒီလင့်ကနေ ဝင်သုံးတိုင်း **သင် ၅၀ ကြိမ် အပိုသုံးခွင့် ရပါမယ်။**\n"
         f"👉 ဒါမှမဟုတ် ပိုမိုသုံးစွဲလိုပါက အောက်ပါ Plan များကို ဝယ်ယူနိုင်ပါတယ်:\n"
-        f"⭐ **Basic (10,000 MMK)**\n"
-        f"💎 **Premium (30,000 MMK)**\n"
-        f"👑 **Premium+ (50,000 MMK)**\n\n"
+        f"⭐ **Basic (7,000 MMK)**\n"
+        f"💎 **Premium (20,000 MMK)**\n"
+        f"👑 **Premium+ (35,000 MMK)**\n\n"
         f"📌 မျှဝေပြီး အပိုသုံးခွင့်ရယူလိုက်ပါ!"
     )
 
@@ -1335,11 +1335,12 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
-        "📌 အောက်ပါ Plan များမှ ရွေးချယ်ပါ။\n\n"
-        "📌 Free (အခမဲ့)\n"
-        "⭐ Basic (10,000 MMK)\n"
-        "💎 Premium (30,000 MMK)\n"
-        "👑 Premium+ (50,000 MMK) (VIP)",
+        "❌ **သင့် Free Plan ၏ သုံးခွင့် ကုန်သွားပါပြီ။**\n\n"
+        "🚀 ဆက်လက်သုံးစွဲရန် အောက်ပါ Plan များထဲမှ တစ်ခုကို ရွေးချယ်ပါ:\n"
+        "⭐ **Basic (7,000 MMK)**\n"
+        "💎 **Premium (20,000 MMK)**\n"
+        "👑 **Premium+ (35,000 MMK)**\n\n"
+        "📸 ငွေလွှဲပြီး Proof ဓာတ်ပုံ ပို့ပေးပါ။"
         reply_markup=reply_markup,
     )
 
@@ -1353,10 +1354,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "start_plan":
         keyboard = [
-            [InlineKeyboardButton("📌 Free (အခမဲ့)", callback_data="sub_free_1m")],
-            [InlineKeyboardButton("⭐ Basic (10,000 MMK/လ)", callback_data="show_price_basic")],
-            [InlineKeyboardButton("💎 Premium (30,000 MMK/လ)", callback_data="show_price_premium")],
-            [InlineKeyboardButton("👑 Premium+ (50,000 MMK/လ)", callback_data="show_price_premium_plus")],
+           [InlineKeyboardButton("📌 Free (အခမဲ့)", callback_data="sub_free_1m")],
+           [InlineKeyboardButton("⭐ Basic (7,000 MMK/လ)", callback_data="show_price_basic")],
+           [InlineKeyboardButton("💎 Premium (20,000 MMK/လ)", callback_data="show_price_premium")],
+           [InlineKeyboardButton("👑 Premium+ (35,000 MMK/လ)", callback_data="show_price_premium_plus")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
