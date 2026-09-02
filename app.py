@@ -1124,24 +1124,24 @@ async def gen_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.commit()
     conn.close()
     
-    # ✅ Auto-send code to user
+    # ✅ Inline Keyboard with Verify Button
+    keyboard = [[InlineKeyboardButton("✅ Verify Code", callback_data=f"verify_{tx_id}")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    # Send code to user with verify button
     try:
         await context.bot.send_message(
             chat_id=int(target_user),
             text=f"🎫 **သင့် {plan.upper()} Plan အတွက် Code ပါ။**\n\n"
                  f"🔑 Code: `{tx_id}`\n"
                  f"⏰ သက်တမ်း: ၂၄ နာရီ\n\n"
-                 f"📌 /verifyid {tx_id} လို့ရိုက်ပြီး Plan ရယူပါ။"
+                 f"အောက်ပါ ခလုတ်ကို နှိပ်ပြီး Plan ရယူပါ။",
+            reply_markup=reply_markup
         )
-        await update.message.reply_text(
-            f"✅ Code `{tx_id}` ကို User `{target_user}` ဆီ ပို့ပြီးပါပြီ။\n"
-            f"📌 Plan: {plan}\n"
-            f"⏰ သက်တမ်း: ၂၄ နာရီ"
-        )
+        await update.message.reply_text(f"✅ Code `{tx_id}` ကို User `{target_user}` ဆီ ပို့ပြီးပါပြီ။")
     except Exception as e:
         await update.message.reply_text(
             f"⚠️ User `{target_user}` ဆီ ပို့လို့မရပါဘူး။\n"
-            f"(User က Bot ကို Block ထားနိုင်တယ်)\n\n"
             f"Code: `{tx_id}` ကို ကိုယ်တိုင်ပို့ပေးပါ။"
         )
 
@@ -1344,6 +1344,58 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"{PAYMENT_INFO}"
         )
         await query.edit_message_text(text)
+
+    if data.startswith("verify_"):
+        tx_id = data.replace("verify_", "")
+        
+        # Check if code exists and is valid
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT plan, used, expiry_date FROM transactions WHERE tx_id=? AND user_id=?", (tx_id, user_id))
+        row = c.fetchone()
+        
+        if not row:
+            await query.edit_message_text("❌ Code မရှိပါဘူး။")
+            conn.close()
+            return
+        
+        plan, used, expiry_date = row
+        
+        if used == 1:
+            await query.edit_message_text("❌ ဒီ Code က သုံးပြီးသားပါ။")
+            conn.close()
+            return
+        
+        if expiry_date and datetime.utcnow().isoformat() > expiry_date:
+            await query.edit_message_text("❌ ဒီ Code ရဲ့ သက်တမ်းကုန်သွားပါပြီ။")
+            conn.close()
+            return
+        
+        # Mark as used and upgrade plan
+        c.execute("UPDATE transactions SET used=1 WHERE tx_id=? AND user_id=?", (tx_id, user_id))
+        price = PLAN_LIMITS[plan]["price"]
+        c.execute("UPDATE users SET plan=?, proof_status='approved', usage_count=0, price=? WHERE user_id=?",
+                  (plan, price, user_id))
+        conn.commit()
+        conn.close()
+        
+        # Send confirmation to user
+        await query.edit_message_text(
+            f"🎉 **Plan အဆင့်မြှင့်ပြီးပါပြီ။**\n\n"
+            f"📌 Plan: **{plan}**"
+        )
+        
+        # Notify admin
+        for admin_id in ADMIN_IDS:
+            try:
+                await context.bot.send_message(
+                    chat_id=admin_id,
+                    text=f"📋 User {user_id} က Code `{tx_id}` နဲ့ Plan ကိုယ်တိုင်အသက်သွင်းလိုက်ပါပြီ။\n"
+                         f"📌 Plan: {plan}"
+                )
+            except Exception as e:
+                logger.error(f"Admin notification error: {e}")
+        return
 
     if data.startswith("send_code_"):
         if user_id not in [str(a) for a in ADMIN_IDS]:
