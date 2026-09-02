@@ -1971,45 +1971,71 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await subscribe(update, context)
         return
 
-   if chat_type in ["group", "supergroup"]:
-    if await is_bot_mentioned(update, context):
-        # ... (နာမည်ဖယ်တာ)
-        if not check_limit(user_id):
-            await update.message.reply_text("❌ သုံးခွင့်ကုန်သွားပါပြီ။")
-            return
-        
-        # ✅ Local Response စစ်ဆေးခြင်း (Token မကုန်စေရန်)
-        local_answer = get_local_response(text)
-        if local_answer:
-            # ✅ increment_usage ကို မခေါ်ပါနဲ့ (Token မကုန်စေရန်)
-            await update.message.reply_text(local_answer)
-            return
-        
-        # ✅ ဒီနေရာမှာ Local Response ကို အရင်စစ်ပါ
-        local_answer = get_local_response(text)
-        if local_answer:
+    # ====== Group Chat ======
+    if chat_type in ["group", "supergroup"]:
+        if await is_bot_mentioned(update, context):
+            # Remove bot name
+            for name in BOT_NAMES:
+                if name.lower() in text.lower():
+                    text = re.sub(name, "", text, flags=re.IGNORECASE)
+            bot_username = (await context.bot.get_me()).username
+            if bot_username:
+                text = re.sub(f"@{bot_username}", "", text, flags=re.IGNORECASE)
+            text = text.strip()
+            if not text:
+                return
+            
+            if not check_limit(user_id):
+                await update.message.reply_text("❌ သုံးခွင့်ကုန်သွားပါပြီ။ Plan အသစ်ရွေးပါ။")
+                return
+            
+            # ✅ Local Response (Token မကုန်စေရန်)
+            local_answer = get_local_response(text)
+            if local_answer:
+                await update.message.reply_text(local_answer)
+                return
+            
+            # ✅ AI Response (Token ကုန်မယ်)
+            await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
+            try:
+                short_prompt = f"Group chat ဖြစ်လို့ တိုတိုနဲ့ ဖြေပါ။ {text}"
+                answer = await ask_model(short_prompt, user_id)
+                answer = clean_text(answer)
+            except Exception as e:
+                logger.error(f"Group message error: {e}")
+                await update.message.reply_text(f"⚠️ Error: {str(e)[:100]}")
+                return
             increment_usage(user_id)
-            await update.message.reply_text(local_answer)
+            await update.message.reply_text(answer, disable_web_page_preview=True)
             return
-        
-        # ✅ Local Response မရှိမှ AI ကိုခေါ်ပါ
-        await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
-        try:
-            short_prompt = f"Group chat ဖြစ်လို့ တိုတိုနဲ့ ဖြေပါ။ {text}"
-            answer = await ask_model(short_prompt, user_id)
-            answer = clean_text(answer)
-        except Exception as e:
-            logger.error(f"Group message error: {e}")
-            await update.message.reply_text(f"⚠️ Error: {str(e)[:100]}")
+
+    # ====== Private Chat ======
+    if chat_type == "private":
+        if not check_limit(user_id):
+            keyboard = [[InlineKeyboardButton("⭐ Plan ရွေးရန်", callback_data="start_plan")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(
+                "❌ **သင့် Free Plan ၏ သုံးခွင့် ကုန်သွားပါပြီ။**\n\n"
+                "🚀 ဆက်လက်သုံးစွဲရန် အောက်ပါ Plan များထဲမှ တစ်ခုကို ရွေးချယ်ပါ:\n"
+                "⭐ **Basic (10,000 MMK)**\n"
+                "💎 **Premium (30,000 MMK)**\n"
+                "👑 **Premium+ (50,000 MMK)**\n\n"
+                "📸 ငွေလွှဲပြီး Proof ဓာတ်ပုံ ပို့ပေးပါ။",
+                reply_markup=reply_markup
+            )
             return
-        increment_usage(user_id)
-        await update.message.reply_text(answer, disable_web_page_preview=True)
-        return
 
         if "သတင်း" in text or "news" in text.lower():
             await fetch_news(update, context)
             return
-            
+        
+        # ✅ Local Response (Token မကုန်စေရန်)
+        local_answer = get_local_response(text)
+        if local_answer:
+            await update.message.reply_text(local_answer)
+            return
+        
+        # ✅ AI Response (Token ကုန်မယ်)
         await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
         try:
             answer = await ask_model(text, user_id)
