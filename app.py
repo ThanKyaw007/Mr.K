@@ -1585,15 +1585,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not check_limit(user_id):
                 await update.message.reply_text("❌ သုံးခွင့်ကုန်သွားပါပြီ။ Plan အသစ်ရွေးပါ။")
                 return
-            local_answer = get_local_response(text)
-            if local_answer:
-                increment_usage(user_id)
-                await update.message.reply_text(local_answer)
-                return
+            
+            # ✅ ပြင်ဆင်ပြီး (Argument ၁ ခုပဲ ပို့တယ်)
             await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
             try:
                 short_prompt = f"Group chat ဖြစ်လို့ တိုတိုနဲ့ ဖြေပါ။ {text}"
-                answer = await ask_model(short_prompt, user_id)
+                answer = await ask_model(short_prompt)  # ✅ Argument ၁ ခုပဲ
                 answer = clean_text(answer)
             except Exception as e:
                 logger.error(f"Group message error: {e}")
@@ -1605,30 +1602,28 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if chat_type == "private":
         if not check_limit(user_id):
-                keyboard = [[InlineKeyboardButton("⭐ Plan ရွေးရန်", callback_data="start_plan")]]
-        await update.message.reply_text(
-            "❌ **သင့် Free Plan ၏ သုံးခွင့် ကုန်သွားပါပြီ။**\n\n"
-            "🚀 ဆက်လက်သုံးစွဲရန် အောက်ပါ Plan များထဲမှ တစ်ခုကို ရွေးချယ်ပါ:\n"
-            "⭐ **Basic (10,000 MMK)**\n"
-            "💎 **Premium (30,000 MMK)**\n"
-            "👑 **Premium+ (50,000 MMK)**\n\n"
-            "📸 ငွေလွှဲပြီး Proof ဓာတ်ပုံ ပို့ပေးပါ။",
-            reply_markup=keyboard
-        )
+            # ✅ ပြင်ဆင်ပြီး (keyboard ကို ဒီမှာ သတ်မှတ်တယ်)
+            keyboard = [[InlineKeyboardButton("⭐ Plan ရွေးရန်", callback_data="start_plan")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(
+                "❌ **သင့် Free Plan ၏ သုံးခွင့် ကုန်သွားပါပြီ။**\n\n"
+                "🚀 ဆက်လက်သုံးစွဲရန် အောက်ပါ Plan များထဲမှ တစ်ခုကို ရွေးချယ်ပါ:\n"
+                "⭐ **Basic (10,000 MMK)**\n"
+                "💎 **Premium (30,000 MMK)**\n"
+                "👑 **Premium+ (50,000 MMK)**\n\n"
+                "📸 ငွေလွှဲပြီး Proof ဓာတ်ပုံ ပို့ပေးပါ။",
+                reply_markup=reply_markup
+            )
             return
 
         if "သတင်း" in text or "news" in text.lower():
             await fetch_news(update, context)
             return
             
-        local_answer = get_local_response(text)
-        if local_answer:
-            increment_usage(user_id)
-            await update.message.reply_text(local_answer)
-            return
+        # ✅ ပြင်ဆင်ပြီး (Argument ၁ ခုပဲ ပို့တယ်)
         await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
         try:
-            answer = await ask_model(text, user_id)
+            answer = await ask_model(text)  # ✅ Argument ၁ ခုပဲ
             answer = clean_text(answer)
         except Exception as e:
             logger.error(f"Handle message error: {e}")
