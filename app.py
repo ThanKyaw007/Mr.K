@@ -1672,11 +1672,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("❌ သုံးခွင့်ကုန်သွားပါပြီ။ Plan အသစ်ရွေးပါ။")
                 return
             
-            # ✅ ပြင်ဆင်ပြီး (Argument ၁ ခုပဲ ပို့တယ်)
             await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
             try:
                 short_prompt = f"Group chat ဖြစ်လို့ တိုတိုနဲ့ ဖြေပါ။ {text}"
-                answer = await ask_model(short_prompt, user_id)  # user_id ကိုပါ ထည့်ပါ
+                answer = await ask_model(short_prompt, user_id)  # ✅ user_id ထည့်ပါ
                 answer = clean_text(answer)
             except Exception as e:
                 logger.error(f"Group message error: {e}")
@@ -1688,7 +1687,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if chat_type == "private":
         if not check_limit(user_id):
-            # ✅ ပြင်ဆင်ပြီး (keyboard ကို ဒီမှာ သတ်မှတ်တယ်)
             keyboard = [[InlineKeyboardButton("⭐ Plan ရွေးရန်", callback_data="start_plan")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(
@@ -1706,10 +1704,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await fetch_news(update, context)
             return
             
-        # ✅ ပြင်ဆင်ပြီး (Argument ၁ ခုပဲ ပို့တယ်)
         await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
         try:
-            answer = await ask_model(text, user_id)  # user_id ကိုပါ ထည့်ပါ
+            answer = await ask_model(text, user_id)  # ✅ user_id ထည့်ပါ
             answer = clean_text(answer)
         except Exception as e:
             logger.error(f"Handle message error: {e}")
