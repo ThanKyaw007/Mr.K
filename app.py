@@ -436,16 +436,7 @@ def save_cached_response(query: str, response: str):
     )
     conn.commit()
     conn.close()
-    try:
-        conn = sqlite3.connect("bot_users.db")
-        c = conn.cursor()
-        c.execute("UPDATE users SET usage_count = 0")
-        conn.commit()
-        conn.close()
-        logger.info("✅ Monthly usage reset completed successfully.")
-    except Exception as e:
-        logger.error(f"❌ Usage reset error: {e}")
-
+    
 # ====== Local Responses (ပိုက်ဆံချွေတာရန်) ======
 LOCAL_RESPONSES = {
     "hello": "ဟယ်လို! မင်္ဂလာပါဗျ။ ဘာကူညီပေးရမလဲ?",
@@ -884,7 +875,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(user_id)
     if not user:
         add_user(user_id, "free")
-        user = ("free", 0, "none", None, 0, None, None, None, None, None, None, None, None) # ၁၃ ခု ထည့်ပါ
+        user = ("free", 0, "none", None, 0, None, None, None, None, None, None, None, None, None) # ၁၃ ခု ထည့်ပါ
     # 👇 ဒီလိုင်းကို ဒီအတိုင်း ပြင်ပါ (birthdate ပါအောင်)
     (plan, usage, proof_status, _, price, _, goals, weaknesses, dream, career, money_mindset, relationship, birthdate) = user
     limit = PLAN_LIMITS[plan]["limit"]
