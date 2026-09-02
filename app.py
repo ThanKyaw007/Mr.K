@@ -1081,7 +1081,7 @@ async def auto_verify_payment(user_id: str, tx_id: str, plan: str, bot) -> bool:
         logger.error(f"❌ Auto verify error: {e}")
         return False
 
-# ====== Admin: Generate Transaction Code ======
+# ====== Admin: Generate Transaction Code (Auto-Send to User) ======
 async def gen_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     if user_id not in [str(a) for a in ADMIN_IDS]:
@@ -1096,6 +1096,8 @@ async def gen_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if plan not in PLAN_LIMITS:
         return await update.message.reply_text("❌ Invalid plan.")
     
+    # Generate unique 5-digit code
+    import random
     tx_id = None
     for _ in range(10):
         candidate = f"{random.randint(0, 99999):05d}"
@@ -1111,8 +1113,10 @@ async def gen_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not tx_id:
         return await update.message.reply_text("❌ Failed to generate unique code. Try again.")
     
+    # 1 day expiry
     expiry_date = (datetime.utcnow() + timedelta(days=1)).isoformat()
     
+    # Save to database
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("INSERT INTO transactions (tx_id, user_id, plan, timestamp, used, expiry_date) VALUES (?, ?, ?, ?, ?, ?)",
@@ -1120,14 +1124,26 @@ async def gen_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.commit()
     conn.close()
     
-    await update.message.reply_text(
-        f"✅ Code generated:\n"
-        f"User: {target_user}\n"
-        f"Plan: {plan}\n"
-        f"Code: `{tx_id}`\n"
-        f"Expires: {expiry_date[:10]} (1 day)\n\n"
-        f"User can verify with: /verifyid {tx_id}"
-    )
+    # ✅ Auto-send code to user
+    try:
+        await context.bot.send_message(
+            chat_id=int(target_user),
+            text=f"🎫 **သင့် {plan.upper()} Plan အတွက် Code ပါ။**\n\n"
+                 f"🔑 Code: `{tx_id}`\n"
+                 f"⏰ သက်တမ်း: ၂၄ နာရီ\n\n"
+                 f"📌 /verifyid {tx_id} လို့ရိုက်ပြီး Plan ရယူပါ။"
+        )
+        await update.message.reply_text(
+            f"✅ Code `{tx_id}` ကို User `{target_user}` ဆီ ပို့ပြီးပါပြီ။\n"
+            f"📌 Plan: {plan}\n"
+            f"⏰ သက်တမ်း: ၂၄ နာရီ"
+        )
+    except Exception as e:
+        await update.message.reply_text(
+            f"⚠️ User `{target_user}` ဆီ ပို့လို့မရပါဘူး။\n"
+            f"(User က Bot ကို Block ထားနိုင်တယ်)\n\n"
+            f"Code: `{tx_id}` ကို ကိုယ်တိုင်ပို့ပေးပါ။"
+        )
 
 # ====== User Self-Verify ======
 async def verifyid(update: Update, context: ContextTypes.DEFAULT_TYPE):
