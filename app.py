@@ -1186,6 +1186,22 @@ async def myhabits(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("📸 ငွေသွင်း proof screenshot ကို ဒီ chat ထဲမှာ Photo အနေနဲ့ ပို့ပေးပါ။")
 
+async def sum_numbers(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Usage: /sum <စာရင်း သို့မဟုတ် ကိန်းဂဏန်းများ>")
+        return
+    text = " ".join(context.args)
+    # ကိန်းဂဏန်းတွေကို ရှာထုတ်မယ် (ဒသမကိန်းတွေပါ ထည့်သွင်းစဉ်းစားမယ်)
+    numbers = re.findall(r'\d+(?:\.\d+)?', text)
+    if not numbers:
+        await update.message.reply_text("❌ ဂဏန်းတွေ မတွေ့ပါဘူး။")
+        return
+    total = sum(float(num) for num in numbers)
+    # ကိန်းပြည့်ဖြစ်ရင် .0 မပြဘဲ ပြမယ်
+    if total.is_integer():
+        total = int(total)
+    await update.message.reply_text(f"🧮 ပေါင်းလဒ်စုစုပေါင်း = {total}")
+
 async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     if not update.message.photo:
@@ -1410,3 +1426,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    application.add_handler(CommandHandler("sum", sum_numbers))
