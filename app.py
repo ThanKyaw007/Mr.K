@@ -337,11 +337,11 @@ def init_db():
     # ✅ Existing tables (unchanged)
     for col in ["birthdate"]:
         try:
-    c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
+            c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
         except sqlite3.OperationalError:
             pass
     
-    c.execute("""CREATE TABLE IF NOT EXISTS users (
+            c.execute("""CREATE TABLE IF NOT EXISTS users (
         user_id TEXT PRIMARY KEY,
         plan TEXT DEFAULT 'free',
         usage_count INTEGER DEFAULT 0,
@@ -363,11 +363,11 @@ def init_db():
     # ✅ Migration
     for col in ["duration", "expiry_date"]:
         try:
-    c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
+            c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
         except sqlite3.OperationalError:
             pass
     
-    c.execute("""CREATE TABLE IF NOT EXISTS referrals (
+            c.execute("""CREATE TABLE IF NOT EXISTS referrals (
         inviter_id TEXT, invited_id TEXT, timestamp TEXT
     )""")
     
