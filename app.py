@@ -1,4 +1,5 @@
 import os
+import pytz 
 import base64
 import re
 import json
@@ -38,8 +39,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ====== Configuration (Security: env variables with fallback) ======
-TELEGRAM_BOT_TOKEN = os.environ.get("BOT_TOKEN") or "8617869426:AAHzomx_Uikd_S69UxCGAp4avOWUx6ytqVM"
-OPENROUTER_API_KEY = os.environ.get("OR_KEY") or "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"
+# ====== Configuration ======
+TELEGRAM_BOT_TOKEN = os.environ.get("BOT_TOKEN") or "YOUR_BOT_TOKEN_HERE"
+OPENROUTER_API_KEY = os.environ.get("OR_KEY") or "YOUR_OPENROUTER_KEY_HERE"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 ADMIN_IDS = [1119128553]
@@ -72,6 +74,13 @@ BOT_NAMES = ["မစ္စတာသန်း", "ကိုသန်း", "သန�
 
 # ====== Flask App ======
 flask_app = Flask(__name__)
+
+def get_db_connection():
+    try:
+        return sqlite3.connect("bot_users.db", check_same_thread=False)
+    except Exception as e:
+        logger.error(f"❌ DB connection error: {e}")
+        raise
 
 def check_auth(username, password):
     return username in ADMIN_USERS and ADMIN_USERS[username] == password
@@ -280,6 +289,11 @@ def backup_and_send(bot):
 def init_db():
     conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
+    for col in ["birthdate"]:
+        try:
+            c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
+        except sqlite3.OperationalError:
+            pass
     c.execute("""CREATE TABLE IF NOT EXISTS users (
         user_id TEXT PRIMARY KEY,
         plan TEXT DEFAULT 'free',
@@ -307,6 +321,9 @@ def init_db():
         response TEXT,
         created_at TEXT
     )""")
+    
+    conn.commit()
+    conn.close()
     for col in ["proof_status", "proof_file_id", "price", "proof_timestamp", "goals", "weaknesses", "dream", "career", "money_mindset", "relationship", "birthdate"]:
         try:
             c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
@@ -330,6 +347,38 @@ def get_user(user_id):
     result = c.fetchone()
     conn.close()
     return result
+
+def normalize_text(text: str) -> str:
+    return re.sub(r'\s+', ' ', text.strip()).lower()
+
+def get_cached_response(query: str) -> str | None:
+    cache_key = normalize_text(query)
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT response, created_at FROM response_cache WHERE query=?", (cache_key,))
+        result = c.fetchone()
+        conn.close()
+        if result:
+            response, created_at = result
+            if (datetime.utcnow() - datetime.fromisoformat(created_at)).days <= 7:
+                return response
+        return None
+    except Exception as e:
+        logger.error(f"❌ Get cache error: {e}")
+        return None
+
+def save_cached_response(query: str, response: str):
+    cache_key = normalize_text(query)
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("INSERT OR REPLACE INTO response_cache (query, response, created_at) VALUES (?, ?, ?)",
+                  (cache_key, response, datetime.utcnow().isoformat()))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.error(f"❌ Save cache error: {e}")
 
 def update_profile(user_id, field, value):
     conn = sqlite3.connect("bot_users.db", check_same_thread=False)
@@ -371,6 +420,13 @@ def give_referral_reward(inviter_id, invited_id):
     try:
         conn = sqlite3.connect("bot_users.db", check_same_thread=False)
         c = conn.cursor()
+        today = datetime.utcnow().date().isoformat()
+        c.execute("SELECT COUNT(*) FROM referrals WHERE inviter_id=? AND timestamp LIKE ?", (inviter_id, f"{today}%"))
+        daily_count = c.fetchone()[0]
+        if daily_count >= 3:
+            logger.warning(f"⚠️ Referral limit reached for {inviter_id}")
+            conn.close()
+            return
         c.execute("SELECT usage_count FROM users WHERE user_id=?", (inviter_id,))
         row = c.fetchone()
         if not row:
@@ -844,6 +900,22 @@ system_prompt = (
 
 # ====== AI Model (DeepSeek First, GPT-4o-mini Fallback) ======
 async def ask_model(prompt: str, user_id: str = None) -> str:
+    for attempt in range(2):
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await client.post(
+                    OPENROUTER_URL,
+                    headers={...},
+                    json={...}
+                )
+                # ... (result processing)
+                return final_answer
+        except Exception as e:
+            if attempt == 1:
+                logger.error(f"DeepSeek failed: {e}. Falling back to GPT-4o-mini.")
+                break
+            await asyncio.sleep(2 ** attempt)  # ✅ exponential backoff
+    # ... (fallback to GPT-4o-mini)
     user_context = ""
     cache_allowed = True
     cache_key = f"{prompt.strip()}|{user_id}"
@@ -921,7 +993,7 @@ async def send_daily_coaching(bot):
     try:
         conn = sqlite3.connect("bot_users.db", check_same_thread=False)
         c = conn.cursor()
-        c.execute("SELECT user_id FROM users WHERE plan IN ('free', 'premium_plus')")
+         c.execute("SELECT user_id FROM users WHERE plan IN ('free', 'premium_plus')")
         users = c.fetchall()
         conn.close()
 
@@ -946,6 +1018,20 @@ async def send_daily_coaching(bot):
         logger.error(f"❌ Daily coaching error: {e}")
 
 # ====== Scheduler ======
+def run_scheduler(bot):
+    schedule.every(30).days.do(reset_usage)
+    
+    # ✅ ဒီအပိုင်းကို ထည့်ပါ (Myanmar Timezone)
+    mm_tz = pytz.timezone("Asia/Yangon")
+    
+    schedule.every().day.at("08:00").do(lambda: asyncio.run(send_daily_coaching(bot)))
+    schedule.every().day.at("03:00").do(lambda: backup_and_send(bot))
+    
+    logger.info("⏰ Scheduler started (Myanmar Time).")
+    while True:
+        schedule.run_pending()
+        time.sleep(60)
+    
 def run_scheduler(bot):
     schedule.every(30).days.do(reset_usage)
     # မြန်မာအချိန် မနက် ၈ နာရီ = UTC မနက် ၁ နာရီခွဲ (01:30)
