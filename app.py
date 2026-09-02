@@ -1193,7 +1193,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         add_user(user_id, "free")
 
     keyboard = [
-        [InlineKeyboardButton("📌 Plan ရွေးရန် (စတင်ရန်)", callback_data="start_plan")],
+        [InlineKeyboardButton("📌 Plan ရွေးရန်", callback_data="start_plan")],
         [InlineKeyboardButton("ℹ️ လမ်းညွှန်ချက်များ (Help)", callback_data="start_help")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1202,17 +1202,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🙏 မင်္ဂလာပါ။ ကျွန်တော် မစ္စတာသန်းပါ။\n"
         "သင့်ရဲ့ လက်ထောက် အဖြစ်နဲ့ ကိုယ်ရေးကိုယ်တာ၊ အလုပ်အကိုင်နဲ့ "
         "တခြားလုပ်ဆောင်ရမယ့် အရာတွေကို ယုံကြည်စွာ ဖြေရှင်းပေးဖို့ အသင့်ပါဗျ။\n\n"
-        "Commands:\n"
-        "/subscribe <plan> - Plan ပြောင်းရန် (free/basic/premium/premium_plus)\n"
-        "/ask <question> - AI ကို မေးမြန်းရန်\n"
-        "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
-        "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n"
-        "/referral - သင့် referral link ရယူရန်\n"
-        "/profile <field> : <value> - Profile သိမ်းရန်\n"
-        "/habit <habit> - Habit ထည့်ရန်\n"
-        "/myhabits - သင့် habits စာရင်းကြည့်ရန်\n"
-        "/help - အကူအညီ\n\n"
-        "💡 သိကောင်းစရာ: အခမဲ့ သုံးချင်ရင် `/subscribe free` နှိပ်ပါ။",
+        "အောက်ပါခလုတ်များမှ ရွေးချယ်ပါ။",
         reply_markup=reply_markup
     )
 
