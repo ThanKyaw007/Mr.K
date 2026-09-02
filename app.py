@@ -1256,6 +1256,30 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     update_proof(user_id, file_id)
     await update.message.reply_text("✅ Proof screenshot ကို လက်ခံရရှိပြီးပါပြီ။ Admin က စစ်ဆေးပါမယ်။")
 
+async def image(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Usage: /image <ပုံဖော်ပြချက်>")
+        return
+    
+    prompt = " ".join(context.args)
+    await update.message.reply_text("🎨 ပုံဖန်တီးနေပါတယ်... ခဏစောင့်ပါ...")
+    
+    try:
+        # Pollinations ကို ခေါ်မယ် (အခမဲ့)
+        url = f"https://image.pollinations.ai/prompt/{prompt}"
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.get(url)
+            if response.status_code == 200:
+                # Image ကို Telegram ကို ပို့ပေးမယ်
+                await update.message.reply_photo(photo=response.content)
+            else:
+                await update.message.reply_text(f"❌ ပုံထုတ်လို့မရပါဘူး: {response.status_code}")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ Error: {str(e)[:100]}")
+
+# main() ထဲမှာ ထည့်ရန်:
+# application.add_handler(CommandHandler("image", image))
+
 
 # ====== Admin Commands ======
 async def verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1456,6 +1480,7 @@ def main():
     application.add_handler(CommandHandler("referral", referral))
     application.add_handler(CommandHandler("sum", sum_numbers))
     application.add_handler(CommandHandler("readphoto", read_photo_command))
+    application.add_handler(CommandHandler("image", image))
     application.add_handler(CommandHandler("verify", verify))
     application.add_handler(CommandHandler("pending_proofs", pending_proofs))
     application.add_handler(CommandHandler("approve_proof", approve_proof))
