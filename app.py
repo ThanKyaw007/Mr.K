@@ -919,7 +919,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "📌 အသုံးပြုနည်း:\n/start - စတင်ရန်\n/help - အကူအညီ\n/subscribe - Plan ရွေးရန်\n/ask <q> - မေးရန်\n/status - အနေအထား\n/profile - ကိုယ်ရေးမှတ်တမ်း\n/habit - အလေ့အထ\n/referral - ဖိတ်ရန်\n\n"
-        "🎯 ကျွန်တော် အကြံပေးနိုင်တဲ့ နယ်ပယ် ၆၆ ခုရှိပါတယ်။"
+        "🎯 ကျွန်တော် အကြံပေးနိုင်တဲ့ နယ်ပယ် ၈၀ ခုရှိပါတယ်။"
     )
 
 async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
