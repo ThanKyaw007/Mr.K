@@ -1,4 +1,5 @@
 import os
+import base64
 import re
 import json
 import sqlite3
@@ -1202,13 +1203,59 @@ async def sum_numbers(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total = int(total)
     await update.message.reply_text(f"🧮 ပေါင်းလဒ်စုစုပေါင်း = {total}")
 
+
+async def read_photo_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data['photo_mode'] = 'read'
+    await update.message.reply_text("📸 ပုံကို ပို့ပေးပါ။ ဒီပုံထဲက စာသားတွေကို ဖတ်ပေးပါမယ်။")
+
 async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     if not update.message.photo:
         return
+    
+    # User က /readphoto ခေါ်ထားရင် ဒီပုံကို ဖတ်ပါမယ်
+    mode = context.user_data.get('photo_mode', 'proof')
+    
+    if mode == 'read':
+        context.user_data['photo_mode'] = 'proof' # ပြီးရင် ပုံမှန်အတိုင်း ပြန်ထားမယ်
+        file = await context.bot.get_file(update.message.photo[-1].file_id)
+        img_bytes = await file.download_as_bytearray()
+        b64_image = base64.b64encode(img_bytes).decode('utf-8')
+        
+        await update.message.reply_text("🤔 ပုံထဲက စာသားတွေကို ဖတ်နေပါတယ်...")
+        
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await client.post(
+                    OPENROUTER_URL,
+                    headers={"Authorization": f"Bearer {OPENROUTER_API_KEY.strip()}", "Content-Type": "application/json"},
+                    json={
+                        "model": "gpt-4o-mini",
+                        "messages": [
+                            {"role": "system", "content": "You are an OCR assistant. Extract all text from the image. If it is a BOQ or list, list the items and calculate the total sum. Output in Myanmar language."},
+                            {"role": "user", "content": [
+                                {"type": "text", "text": "Read the text in this image."},
+                                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"}}
+                            ]}
+                        ],
+                        "max_tokens": 800
+                    }
+                )
+                result = response.json()
+                if "choices" in result and len(result["choices"]) > 0:
+                    text = result["choices"][0]["message"]["content"].strip()
+                    await update.message.reply_text(text)
+                else:
+                    await update.message.reply_text("❌ ဖတ်လို့မရပါဘူး။ နောက်တစ်ခါ ထပ်ကြိုးစားကြည့်ပါ။")
+        except Exception as e:
+            await update.message.reply_text(f"⚠️ Error: {str(e)[:100]}")
+        return
+    
+    # ဒီအောက်က မူလ Proof System စနစ်ပါ (မပြောင်းပါ)
     file_id = update.message.photo[-1].file_id
     update_proof(user_id, file_id)
     await update.message.reply_text("✅ Proof screenshot ကို လက်ခံရရှိပြီးပါပြီ။ Admin က စစ်ဆေးပါမယ်။")
+
 
 # ====== Admin Commands ======
 async def verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
