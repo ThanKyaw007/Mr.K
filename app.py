@@ -61,10 +61,46 @@ PAYMENT_INFO = (
 )
 
 PLAN_LIMITS = {
-    "free": {"limit": 50, "price": 0},
-    "basic": {"limit": 500, "price": 10000},
-    "premium": {"limit": 1500, "price": 30000},
-    "premium_plus": {"limit": 5000, "price": 50000},
+    "free": {
+        "limit": 50,
+        "price": 0,
+        "prices": {"1m": 0, "3m": 0, "12m": 0}
+    },
+    "basic": {
+        "limit": 500,
+        "price": 10000,
+        "prices": {
+            "1m": 10000,
+            "3m": 25000,
+            "12m": 80000
+        }
+    },
+    "premium": {
+        "limit": 1500,
+        "price": 30000,
+        "prices": {
+            "1m": 30000,
+            "3m": 75000,
+            "12m": 240000
+        }
+    },
+    "premium_plus": {
+        "limit": 5000,
+        "price": 50000,
+        "prices": {
+            "1m": 50000,
+            "3m": 125000,
+            "12m": 400000
+        }
+    }
+}
+
+def get_plan_price(plan, duration="1m"):
+    return PLAN_LIMITS[plan]["prices"].get(duration, PLAN_LIMITS[plan]["price"])
+
+def get_duration_label(duration):
+    labels = {"1m": "၁ လ", "3m": "၃ လ", "12m": "၁၂ လ"}
+    return labels.get(duration, duration)
 }
 
 def get_price_usd(price_mmk):
@@ -264,6 +300,27 @@ def clean_text(text):
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 
+def calculate_expiry(duration):
+    """သက်တမ်းအလိုက် Expiry Date ကို တွက်ချက်မယ်"""
+    if duration == "1m":
+        delta = timedelta(days=30)
+    elif duration == "3m":
+        delta = timedelta(days=90)
+    elif duration == "12m":
+        delta = timedelta(days=365)
+    else:
+        delta = timedelta(days=30)
+    return (datetime.utcnow() + delta).isoformat()
+
+def get_plan_price(plan, duration="1m"):
+    """သက်တမ်းအလိုက် ဈေးနှုန်းကို ပြန်ပေးမယ်"""
+    return PLAN_LIMITS[plan]["prices"].get(duration, PLAN_LIMITS[plan]["price"])
+
+def get_duration_label(duration):
+    labels = {"1m": "၁ လ", "3m": "၃ လ", "12m": "၁၂ လ"}
+    return labels.get(duration, duration)
+
+
 # ====== Database Backup Function ======
 def backup_and_send(bot):
     try:
@@ -297,7 +354,7 @@ def init_db():
         except sqlite3.OperationalError:
             pass
     
-    c.execute("""CREATE TABLE IF NOT EXISTS users (
+   c.execute("""CREATE TABLE IF NOT EXISTS users (
         user_id TEXT PRIMARY KEY,
         plan TEXT DEFAULT 'free',
         usage_count INTEGER DEFAULT 0,
@@ -311,8 +368,17 @@ def init_db():
         career TEXT,
         money_mindset TEXT,
         relationship TEXT,
-        birthdate TEXT
+        birthdate TEXT,
+        duration TEXT DEFAULT '1m',
+        expiry_date TEXT
     )""")
+    
+    # ✅ Migration
+    for col in ["duration", "expiry_date"]:
+        try:
+            c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
+        except sqlite3.OperationalError:
+            pass
     
     c.execute("""CREATE TABLE IF NOT EXISTS referrals (
         inviter_id TEXT, invited_id TEXT, timestamp TEXT
@@ -352,11 +418,17 @@ def init_db():
     conn.close()
     logger.info("✅ Database initialized successfully.")
 
-def add_user(user_id, plan="free"):
+def add_user(user_id, plan="free", duration="1m"):
     conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
-    price = PLAN_LIMITS[plan]["price"]
-    c.execute("""INSERT OR REPLACE INTO users (user_id, plan, usage_count, proof_status, proof_file_id, price, proof_timestamp, goals, weaknesses, dream, career, money_mindset, relationship, birthdate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (user_id, plan, 0, "none", None, price, None, None, None, None, None, None, None, None))
+    price = get_plan_price(plan, duration)
+    expiry_date = calculate_expiry(duration)
+    c.execute("""INSERT OR REPLACE INTO users (
+        user_id, plan, usage_count, proof_status, proof_file_id, price, proof_timestamp,
+        goals, weaknesses, dream, career, money_mindset, relationship, birthdate,
+        duration, expiry_date
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+    (user_id, plan, 0, "none", None, price, None, None, None, None, None, None, None, None, duration, expiry_date))
     conn.commit()
     conn.close()
 
@@ -1289,21 +1361,82 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(query.from_user.id)
     data = query.data
 
+    # ... (ရှိပြီးသား start_help, sub_, verify_, send_code_)
+
     if data == "start_plan":
         keyboard = [
-            [InlineKeyboardButton("📌 Free (အခမဲ့)", callback_data="sub_free")],
-            [InlineKeyboardButton("⭐ Basic (10,000 MMK)", callback_data="sub_basic")],
-            [InlineKeyboardButton("💎 Premium (30,000 MMK)", callback_data="sub_premium")],
-            [InlineKeyboardButton("👑 Premium+ (50,000 MMK)", callback_data="sub_premium_plus")],
+            [InlineKeyboardButton("📌 Free (အခမဲ့)", callback_data="sub_free_1m")],
+            [InlineKeyboardButton("⭐ Basic (10,000 MMK/လ)", callback_data="show_price_basic")],
+            [InlineKeyboardButton("💎 Premium (30,000 MMK/လ)", callback_data="show_price_premium")],
+            [InlineKeyboardButton("👑 Premium+ (50,000 MMK/လ)", callback_data="show_price_premium_plus")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
-            "📌 အောက်ပါ Plan များမှ ရွေးချယ်ပါ။\n\n"
-            "📌 Free (အခမဲ့)\n"
-            "⭐ Basic (10,000 MMK)\n"
-            "💎 Premium (30,000 MMK)\n"
-            "👑 Premium+ (50,000 MMK) (VIP)",
+            "📌 Plan ရွေးချယ်ပါ။\n\n"
+            "💡 သက်တမ်းကြာလေ ဈေးလျှော့လေ ရမှာပါ။",
             reply_markup=reply_markup
+        )
+        return
+
+    # ====== Show Price (Plan) ======
+    if data.startswith("show_price_"):
+        plan = data.replace("show_price_", "")
+        if plan not in PLAN_LIMITS:
+            await query.edit_message_text("❌ Invalid plan.")
+            return
+        
+        prices = PLAN_LIMITS[plan]["prices"]
+        keyboard = [
+            [InlineKeyboardButton(f"📆 ၁ လ ({prices['1m']:,} MMK)", callback_data=f"sub_{plan}_1m")],
+            [InlineKeyboardButton(f"📆 ၃ လ ({prices['3m']:,} MMK) - လျှော့ဈေး", callback_data=f"sub_{plan}_3m")],
+            [InlineKeyboardButton(f"📆 ၁၂ လ ({prices['12m']:,} MMK) - အများဆုံးလျှော့ဈေး", callback_data=f"sub_{plan}_12m")],
+            [InlineKeyboardButton("🔙 နောက်သို့", callback_data="start_plan")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            f"📌 **{plan.upper()} Plan** အတွက် သက်တမ်းရွေးပါ။\n\n"
+            f"💰 ၁ လ: {prices['1m']:,} MMK\n"
+            f"💰 ၃ လ: {prices['3m']:,} MMK (လျှော့ဈေး)\n"
+            f"💰 ၁၂ လ: {prices['12m']:,} MMK (အများဆုံးလျှော့ဈေး)",
+            reply_markup=reply_markup
+        )
+        return
+
+    # ====== Subscribe with Duration ======
+    if data.startswith("sub_"):
+        parts = data.split("_", 2)
+        if len(parts) < 3:
+            await query.edit_message_text("❌ Invalid request.")
+            return
+        plan = parts[1]
+        duration = parts[2]
+        
+        if plan not in PLAN_LIMITS:
+            await query.edit_message_text("❌ Invalid plan.")
+            return
+        if duration not in ["1m", "3m", "12m"]:
+            await query.edit_message_text("❌ Invalid duration.")
+            return
+        
+        price = get_plan_price(plan, duration)
+        expiry_date = calculate_expiry(duration)
+        
+        conn = sqlite3.connect("bot_users.db", check_same_thread=False)
+        c = conn.cursor()
+        c.execute("UPDATE users SET plan=?, proof_status='waiting', price=?, duration=?, expiry_date=? WHERE user_id=?",
+                  (plan, price, duration, expiry_date, user_id))
+        conn.commit()
+        conn.close()
+        
+        duration_label = get_duration_label(duration)
+        
+        await query.edit_message_text(
+            f"📌 **{plan.upper()}** Plan ကို **{duration_label}** အတွက် ရွေးလိုက်ပါပြီ။\n"
+            f"💰 စျေးနှုန်း: {price:,} MMK\n"
+            f"⏰ သက်တမ်းကုန်ဆုံးရက်: {expiry_date[:10]}\n\n"
+            f"📸 ကျေးဇူးပြုပြီး ငွေသွင်း proof screenshot ကို ပို့ပါ။\n\n"
+            f"{PAYMENT_INFO}"
         )
         return
 
