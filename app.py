@@ -708,7 +708,7 @@ LOCAL_RESPONSES = {
     "ဘာသာပြန်": "ဘာသာစကားများ အပြန်အလှန် ဘာသာပြန်ဆိုခြင်းနှင့် သဒ္ဒါပြင်ဆင်ခြင်းအတွက် /ask မှာ မေးပါဗျ။",
     "ဘာသာစကား": "အင်္ဂလိပ်၊ တရုတ်၊ ထိုင်း စသည့် ဘာသာစကားများ သင်ယူလေ့လာလိုပါက /ask မှာ မေးပါ။",
     "အင်္ဂလိပ်စာ": "အင်္ဂလိပ်စကားပြော၊ သဒ္ဒါနှင့် ဘာသာပြန်ခြင်းအတွက် /ask မှာ မေးပါ။",
-    "တရုတ်စာ": "တရုတ်စကားပြောနှင့် တရုတ်ဘာသာပြန်ခြင်းအတွက် /ask မှာ မေးပါ။"
+    "တရုတ်စာ": "တရုတ်စကားပြောနှင့် တရုတ်ဘာသာပြန်ခြင်းအတွက် /ask မှာ မေးပါ။",
 }
 
 def get_local_response(user_text):
@@ -1022,7 +1022,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "/profile - ကိုယ်ရေးမှတ်တမ်း\n"
             "/habit - အလေ့အထ\n"
             "/referral - ဖိတ်ရန်\n\n"
-            "🎯 ကျွန်တော် အကြံပေးနိုင်တဲ့ နယ်ပယ် ၆၅ ခုရှိပါတယ်။"
+            "🎯 ကျွန်တော် အကြံပေးနိုင်တဲ့ နယ်ပယ် ၁၂၀+ ခုရှိပါတယ်။"
         )
         return
 
@@ -1055,7 +1055,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(user_id)
     if not user:
         add_user(user_id, "free")
-        user = ("free", 0, "none", None, 0, None, None, None, None, None, None, None, None, None) # ၁၃ ခု ထည့်ပါ
+        user = ("free", 0, "none", None, 0, None, None, None, None, None, None, None, None) # ၁၃ ခု ထည့်ပါ
     # 👇 ဒီလိုင်းကို ဒီအတိုင်း ပြင်ပါ (birthdate ပါအောင်)
     (plan, usage, proof_status, _, price, _, goals, weaknesses, dream, career, money_mindset, relationship, birthdate) = user
     limit = PLAN_LIMITS[plan]["limit"]
