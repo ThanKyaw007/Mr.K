@@ -297,6 +297,11 @@ def init_db():
     c.execute("""CREATE TABLE IF NOT EXISTS habits (
         user_id TEXT, habit TEXT, created_at TEXT
     )""")
+        c.execute("""CREATE TABLE IF NOT EXISTS response_cache (
+        query TEXT PRIMARY KEY,
+        response TEXT,
+        created_at TEXT
+    )""")
     for col in ["proof_status", "proof_file_id", "price", "proof_timestamp", "goals", "weaknesses", "dream", "career", "money_mindset", "relationship", "birthdate"]:
         try:
             c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
@@ -403,6 +408,26 @@ def get_habits(user_id):
     return results
 
 def reset_usage():
+    # ====== Response Cache (ပိုက်ဆံချွေတာရန်) ======
+def get_cached_response(query: str) -> str | None:
+    """ဆင်တူတဲ့ မေးခွန်းအတွက် အရင်ဖြေထားတဲ့ အဖြေကို ရှာမယ်"""
+    conn = sqlite3.connect("bot_users.db")
+    c = conn.cursor()
+    c.execute("SELECT response FROM response_cache WHERE query=?", (query,))
+    result = c.fetchone()
+    conn.close()
+    return result[0] if result else None
+
+def save_cached_response(query: str, response: str):
+    """အဖြေအသစ်ကို Cache ထဲ သိမ်းမယ်"""
+    conn = sqlite3.connect("bot_users.db")
+    c = conn.cursor()
+    c.execute(
+        "INSERT OR REPLACE INTO response_cache (query, response, created_at) VALUES (?, ?, ?)",
+        (query, response, datetime.utcnow().isoformat()),
+    )
+    conn.commit()
+    conn.close()
     try:
         conn = sqlite3.connect("bot_users.db")
         c = conn.cursor()
@@ -593,14 +618,17 @@ system_prompt = (
 # ====== AI Model (DeepSeek First, GPT-4o-mini Fallback) ======
 async def ask_model(prompt: str, user_id: str = None) -> str:
     user_context = ""
+    cache_allowed = True  # Cache ကို ခွင့်ပြုမလား
+
     if user_id:
         user_data = get_user(user_id)
         if user_data:
             # 👇 ဒီမှာ (၁၃) ခုနဲ့ ဖြေရှင်းပါ (birthdate ထည့်ပြီး)
             (plan, usage, proof_status, _, _, _, goals, weaknesses, dream, career, money_mindset, relationship, birthdate) = user_data
             
-            # birthdate ကိုပါ စစ်ဆေးပါ
+            # Profile မှာ ဒေတာတွေ ရှိနေရင် Cache မသုံးပါနဲ့ (သူ့အတွက် သီးသန့်ဖြေရမလို့)
             if any([goals, weaknesses, dream, career, money_mindset, relationship, birthdate]):
+                cache_allowed = False
                 user_context = "\n\n[အသုံးပြုသူ၏ ကိုယ်ရေးအချက်အလက်များ]\n"
                 if goals: user_context += f"- ပန်းတိုင်: {goals}\n"
                 if career: user_context += f"- အလုပ်အကိုင်: {career}\n"
@@ -608,8 +636,15 @@ async def ask_model(prompt: str, user_id: str = None) -> str:
                 if weaknesses: user_context += f"- အားနည်းချက်: {weaknesses}\n"
                 if money_mindset: user_context += f"- ငွေကြေးစိတ်ဓာတ်: {money_mindset}\n"
                 if relationship: user_context += f"- ဆက်ဆံရေး: {relationship}\n"
-                if birthdate: user_context += f"- မွေးနေ့: {birthdate}\n"  # 👈 ဗေဒင်အတွက် မွေးနေ့ကို AI ဆီ ပို့ပေးမယ်
+                if birthdate: user_context += f"- မွေးနေ့: {birthdate}\n"
 
+    # Cache ထဲ အရင်ရှာမယ် (Profile မရှိရင်သာ)
+    if cache_allowed:
+        cached = get_cached_response(prompt)
+        if cached:
+            return cached
+
+    # DeepSeek ကို စမ်းမယ်
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(
@@ -619,13 +654,19 @@ async def ask_model(prompt: str, user_id: str = None) -> str:
             )
             result = response.json()
             if "choices" in result and len(result["choices"]) > 0:
-                return result["choices"][0]["message"]["content"].strip()
+                final_answer = result["choices"][0]["message"]["content"].strip()
+                # အဖြေရပြီဆိုရင် Cache ထဲ သိမ်းမယ် (Profile မရှိရင်သာ)
+                if cache_allowed:
+                    save_cached_response(prompt, final_answer)
+                return final_answer
             elif "error" in result:
                 raise Exception(result["error"]["message"])
             else:
                 raise Exception("Unexpected API response: " + str(result))
     except Exception as e:
         logger.error(f"DeepSeek failed: {e}. Falling back to GPT-4o-mini.")
+        
+        # GPT-4o-mini ကို ပြန်ခေါ်မယ် (Fallback)
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(
                 OPENROUTER_URL,
@@ -634,7 +675,11 @@ async def ask_model(prompt: str, user_id: str = None) -> str:
             )
             result = response.json()
             if "choices" in result and len(result["choices"]) > 0:
-                return result["choices"][0]["message"]["content"].strip()
+                final_answer = result["choices"][0]["message"]["content"].strip()
+                # အဖြေရပြီဆိုရင် Cache ထဲ သိမ်းမယ် (Profile မရှိရင်သာ)
+                if cache_allowed:
+                    save_cached_response(prompt, final_answer)
+                return final_answer
             elif "error" in result:
                 raise Exception(result["error"]["message"])
             else:
