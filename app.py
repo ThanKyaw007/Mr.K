@@ -291,8 +291,7 @@ def backup_and_send(bot):
         logger.error(f"❌ Backup error: {e}")
 
 # ====== Database Functions ======
-# ====== Database: Add transactions table ======
-# ====== Database: Add transactions table with expiry ======
+
 def init_db():
     conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
@@ -319,33 +318,56 @@ def init_db():
 # ====== Rate Limiting ======
 verify_attempts = {}
 
-# ====== Auto Verify Payment ======
-async def auto_verify_payment(user_id: str, tx_id: str, plan: str, bot) -> bool:
-    try:
-        conn = get_db_connection()
-        c = conn.cursor()
+# ====== Verify ID (User Self-Verify) ======
+async def verifyid(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
 
-        c.execute("SELECT used, expiry_date FROM transactions WHERE tx_id=? AND user_id=?", (tx_id, user_id))
-        row = c.fetchone()
-        if not row:
-            conn.close()
-            return False
-        
-        used, expiry_date = row
-        if used == 1:
-            conn.close()
-            return False
-        
-        if expiry_date and datetime.utcnow().isoformat() > expiry_date:
-            conn.close()
-            return False
+    if len(context.args) < 1:
+        return await update.message.reply_text("Usage: /verifyid <transaction_code>")
 
-        c.execute("UPDATE transactions SET used=1 WHERE tx_id=? AND user_id=?", (tx_id, user_id))
-        price = PLAN_LIMITS[plan]["price"]
-        c.execute("UPDATE users SET plan=?, proof_status='approved', usage_count=0, price=? WHERE user_id=?",
-                  (plan, price, user_id))
-        conn.commit()
+    tx_id = context.args[0]
+
+    if not re.match(r"^\d{5}$", tx_id):
+        return await update.message.reply_text("❌ Invalid transaction code. Must be exactly 5 digits.")
+
+    # ✅ Rate limiting
+    now = time.time()
+    if user_id not in verify_attempts:
+        verify_attempts[user_id] = []
+    verify_attempts[user_id] = [t for t in verify_attempts[user_id] if now - t < 600]
+    
+    if len(verify_attempts[user_id]) >= 5:
+        return await update.message.reply_text(
+            "❌ Too many attempts. Please wait 10 minutes and try again."
+        )
+    verify_attempts[user_id].append(now)
+
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT plan, expiry_date FROM transactions WHERE tx_id=? AND user_id=?", (tx_id, user_id))
+    row = c.fetchone()
+
+    if not row:
         conn.close()
+        return await update.message.reply_text("❌ Transaction code not found or not assigned to you.")
+
+    plan, expiry_date = row
+    
+    if expiry_date and datetime.utcnow().isoformat() > expiry_date:
+        conn.close()
+        return await update.message.reply_text("❌ This transaction code has expired. Please contact admin.")
+
+    # ✅ await နဲ့ ခေါ်ပါ
+    success = await auto_verify_payment(user_id, tx_id, plan, context.bot)
+    
+    if success:
+        await update.message.reply_text(
+            f"✅ Transaction {tx_id} verified.\n"
+            f"🎉 Your plan upgraded to {plan}."
+        )
+    else:
+        await update.message.reply_text("❌ Transaction code already used or error occurred.")
+
         
         # Admin notification
         for admin_id in ADMIN_IDS:
@@ -411,28 +433,6 @@ async def gen_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Expires: {expiry_date[:10]} (1 day)\n\n"
         f"User can verify with: /verifyid {tx_id}"
     )
-
-# ====== Auto Verify Payment ======
-async def auto_verify_payment(user_id: str, tx_id: str, plan: str, bot) -> bool:
-    try:
-        conn = get_db_connection()
-        c = conn.cursor()
-
-        c.execute("SELECT used, expiry_date FROM transactions WHERE tx_id=? AND user_id=?", (tx_id, user_id))
-        row = c.fetchone()
-        if not row:
-            conn.close()
-            return False
-        
-        used, expiry_date = row
-        if used == 1:
-            conn.close()
-            return False
-        
-        # ✅ ဒီနေရာက အတိုင်းသားပါ (1 day ဖြစ်သွားပြီ)
-        if expiry_date and datetime.utcnow().isoformat() > expiry_date:
-            conn.close()
-            return False
 
         
 def init_db():
@@ -1894,6 +1894,8 @@ def main():
     application.add_handler(CommandHandler("readphoto", read_photo_command))
     application.add_handler(CommandHandler("image", image))
     application.add_handler(CommandHandler("news", news_command))
+    application.add_handler(CommandHandler("gen_code", gen_code))      # Admin code generator
+    application.add_handler(CommandHandler("verifyid", verifyid))      # User self-verify
     application.add_handler(CommandHandler("verify", verify))
     application.add_handler(CommandHandler("pending_proofs", pending_proofs))
     application.add_handler(CommandHandler("approve_proof", approve_proof))
