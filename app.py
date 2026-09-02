@@ -10,6 +10,7 @@ import functools
 import logging
 import schedule
 import time
+import xml.etree.ElementTree as ET
 from docx import Document
 from gtts import gTTS
 from datetime import datetime
@@ -1383,6 +1384,44 @@ async def text_to_speech(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"⚠️ Error: {str(e)[:100]}")
 
+async def fetch_news(update: Update, context: ContextTypes.DEFAULT_TYPE, topic: str = None):
+    """Google News RSS ကနေ သတင်းတွေ ဆွဲထုတ်ပြီး ပြပေးမယ်"""
+    await update.message.reply_text("📰 သတင်းတွေ ရှာနေပါတယ်... ခဏစောင့်ပါ...")
+    try:
+        if topic:
+            url = f"https://news.google.com/rss/search?q={topic}&hl=en&gl=MM&ceid=MM:en"
+        else:
+            url = "https://news.google.com/rss?hl=en&gl=MM&ceid=MM:en"
+        
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            root = ET.fromstring(response.text)
+        
+        items = root.findall(".//item")[:10]  # ထိပ်ဆုံး ၁၀ ခု
+        if not items:
+            await update.message.reply_text("❌ သတင်းမတွေ့ပါဘူး။ နောက်တစ်ခါ ထပ်ကြိုးစားပါ။")
+            return
+        
+        news_text = "📰 **နောက်ဆုံးရ သတင်းများ**\n\n"
+        for i, item in enumerate(items, 1):
+            title = item.find("title").text
+            link = item.find("link").text
+            news_text += f"{i}. {title}\n"
+            news_text += f"   🔗 {link}\n\n"
+        
+        await update.message.reply_text(news_text, disable_web_page_preview=True)
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ Error: {str(e)[:100]}")
+
+async def news_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # /news <topic> (ဥပမာ - /news technology)
+    if context.args:
+        topic = " ".join(context.args)
+        await fetch_news(update, context, topic)
+    else:
+        await fetch_news(update, context)
+
 # main() ထဲမှာ ထည့်ရန်:
 # application.add_handler(CommandHandler("image", image))
 
@@ -1538,6 +1577,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not check_limit(user_id):
             await update.message.reply_text("❌ သုံးခွင့်ကုန်သွားပါပြီ။ Plan အသစ်ရွေးပါ။")
             return
+
+        if "သတင်း" in text or "news" in text.lower():
+            await fetch_news(update, context)
+            return
+            
         local_answer = get_local_response(text)
         if local_answer:
             increment_usage(user_id)
@@ -1590,6 +1634,7 @@ def main():
     application.add_handler(CommandHandler("tts", text_to_speech))
     application.add_handler(CommandHandler("readphoto", read_photo_command))
     application.add_handler(CommandHandler("image", image))
+    application.add_handler(CommandHandler("news", news_command))
     application.add_handler(CommandHandler("verify", verify))
     application.add_handler(CommandHandler("pending_proofs", pending_proofs))
     application.add_handler(CommandHandler("approve_proof", approve_proof))
