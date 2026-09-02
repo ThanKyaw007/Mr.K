@@ -10,6 +10,8 @@ import functools
 import logging
 import schedule
 import time
+from docx import Document
+from gtts import gTTS
 from datetime import datetime
 from difflib import SequenceMatcher
 from flask import Flask, request, Response, send_file
@@ -1277,6 +1279,110 @@ async def image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"⚠️ Error: {str(e)[:100]}")
 
+async def make_cv(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text(
+            "Usage: /cv <နာမည်> | <ဖုန်း> | <ပညာရေး> | <အတွေ့အကြုံ>\n"
+            "Example: /cv ကိုအောင် | 09xxxx | တက္ကသိုလ် | Sales အတွေ့အကြုံ ၂ နှစ်"
+        )
+        return
+
+    data = " ".join(context.args).split("|")
+    if len(data) < 4:
+        await update.message.reply_text("❌ ပုံစံမှားနေပါတယ်။ `|` နဲ့ ခြားပြီး အချက် ၄ ချက် ထည့်ပါ။")
+        return
+
+    name = data[0].strip()
+    phone = data[1].strip()
+    education = data[2].strip()
+    experience = data[3].strip()
+
+    doc = Document()
+    doc.add_heading(f"CV - {name}", 0)
+    doc.add_paragraph(f"Phone: {phone}")
+    doc.add_heading("Education", level=1)
+    doc.add_paragraph(education)
+    doc.add_heading("Experience", level=1)
+    doc.add_paragraph(experience)
+
+    filename = "CV_Output.docx"
+    doc.save(filename)
+
+    with open(filename, "rb") as f:
+        await update.message.reply_document(document=f, filename=filename, caption=f"📄 {name} ၏ CV ဖိုင် ပါ။")
+    os.remove(filename)
+
+async def get_weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Usage: /weather <မြို့နယ်နာမည်>\nExample: /weather Yangon")
+        return
+
+    city = " ".join(context.args)
+    await update.message.reply_text(f"🌍 {city} ရဲ့ ရာသီဥတုကို ရှာနေပါတယ်...")
+
+    try:
+        # မြို့ကို Latitude/Longitude ပြောင်းမယ် (Open-Meteo Geocoding - Free)
+        geo_res = await httpx.AsyncClient(timeout=10).get(
+            f"https://geocoding-api.open-meteo.com/v1/search?name={city}&count=1&language=en&format=json"
+        )
+        geo_data = geo_res.json()
+        if not geo_data.get("results"):
+            await update.message.reply_text("❌ ဒီမြို့ကို ရှာမတွေ့ပါဘူး။ နာမည်အပြည့်အစုံ ရိုက်ပါ။")
+            return
+
+        lat = geo_data["results"][0]["latitude"]
+        lon = geo_data["results"][0]["longitude"]
+        place_name = geo_data["results"][0]["name"]
+
+        # ရာသီဥတု ဒေတာ ယူမယ် (Open-Meteo Weather API - Free)
+        weather_res = await httpx.AsyncClient(timeout=10).get(
+            f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
+        )
+        weather_data = weather_res.json()
+        current = weather_data.get("current_weather", {})
+
+        temperature = current.get("temperature")
+        wind_speed = current.get("windspeed")
+        weather_code = current.get("weathercode")
+
+        # ရာသီဥတု အခြေအနေ ဘာသာပြန်မယ်
+        conditions = {
+            0: "သာယာနေပါတယ် ☀️", 1: "နည်းနည်းတိမ်ထူနေပါတယ် ⛅", 2: "တိမ်ထူနေပါတယ် ☁️", 3: "အုံ့ဆိုင်းနေပါတယ် 🌥️",
+            45: "မြူဆိုင်းနေပါတယ် 🌫️", 51: "အလွန်နည်းသော မိုးစက်ကျနေပါတယ် 🌦️", 61: "မိုးရွာနေပါတယ် 🌧️",
+            63: "မိုးအသင့်အတင့် ရွာနေပါတယ် 🌧️", 65: "မိုးသည်းထန်စွာ ရွာနေပါတယ် ⛈️", 71: "နှင်းကျနေပါတယ် ❄️",
+            80: "မိုးသက်မုန်တိုင်း ကျနေပါတယ် 🌩️", 95: "မိုးကြိုးမုန်တိုင်း ကျနေပါတယ် ⚡"
+        }
+        condition_text = conditions.get(weather_code, "ရာသီဥတု အခြေအနေ သိမရပါဘူး")
+
+        await update.message.reply_text(
+            f"📍 **{place_name}** ရဲ့ လက်ရှိရာသီဥတု - \n\n"
+            f"🌡️ အပူချိန်: {temperature}°C\n"
+            f"💨 လေတိုက်နှုန်း: {wind_speed} km/h\n"
+            f"☁️ အခြေအနေ: {condition_text}"
+        )
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ Error: {str(e)[:100]}")
+
+async def text_to_speech(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Usage: /tts <စာသား> (အသံထုတ်ချင်တဲ့ စာသားကို ရိုက်ပါ)")
+        return
+
+    text = " ".join(context.args)
+    await update.message.reply_text("🔊 အသံဖိုင်ကို ဖန်တီးနေပါတယ်...")
+
+    try:
+        # မြန်မာစာအတွက် lang='my' သုံးပါမယ်။ အင်္ဂလိပ်စာဆို lang='en' ပြောင်းပါ
+        tts = gTTS(text=text, lang='my', slow=False)
+        filename = "speech.mp3"
+        tts.save(filename)
+
+        with open(filename, "rb") as f:
+            await update.message.reply_audio(audio=f, title="Mr.T ဖတ်ပေးတဲ့ အသံ", caption="🔊 အသံဖိုင် ပါ။")
+        os.remove(filename)
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ Error: {str(e)[:100]}")
+
 # main() ထဲမှာ ထည့်ရန်:
 # application.add_handler(CommandHandler("image", image))
 
@@ -1479,6 +1585,9 @@ def main():
     application.add_handler(CommandHandler("proof", proof))
     application.add_handler(CommandHandler("referral", referral))
     application.add_handler(CommandHandler("sum", sum_numbers))
+    application.add_handler(CommandHandler("cv", make_cv))
+    application.add_handler(CommandHandler("weather", get_weather))
+    application.add_handler(CommandHandler("tts", text_to_speech))
     application.add_handler(CommandHandler("readphoto", read_photo_command))
     application.add_handler(CommandHandler("image", image))
     application.add_handler(CommandHandler("verify", verify))
