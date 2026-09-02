@@ -1482,6 +1482,7 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.photo:
         return
     
+    # ====== Check if it's OCR mode ======
     mode = context.user_data.get('photo_mode', 'proof')
     
     if mode == 'read':
@@ -1500,7 +1501,7 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     json={
                         "model": "gpt-4o-mini",
                         "messages": [
-                            {"role": "system", "content": "You are an OCR assistant. Extract all text from the image. If it is a BOQ or list, list the items and calculate the total sum. Output in Myanmar language."},
+                            {"role": "system", "content": "You are an OCR assistant. Extract all text from the image."},
                             {"role": "user", "content": [
                                 {"type": "text", "text": "Read the text in this image."},
                                 {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"}}
@@ -1514,14 +1515,42 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     text = result["choices"][0]["message"]["content"].strip()
                     await update.message.reply_text(text)
                 else:
-                    await update.message.reply_text("❌ ဖတ်လို့မရပါဘူး။ နောက်တစ်ခါ ထပ်ကြိုးစားကြည့်ပါ။")
+                    await update.message.reply_text("❌ ဖတ်လို့မရပါဘူး။")
         except Exception as e:
             await update.message.reply_text(f"⚠️ Error: {str(e)[:100]}")
         return
     
+    # ====== Proof Mode (Auto-Verify System) ======
     file_id = update.message.photo[-1].file_id
+    
+    # Save to database (still track proof for record)
     update_proof(user_id, file_id)
-    await update.message.reply_text("✅ Proof screenshot ကို လက်ခံရရှိပြီးပါပြီ။ Admin က စစ်ဆေးပါမယ်။")
+    
+    # User confirmation
+    await update.message.reply_text(
+        "📸 Screenshot ကို လက်ခံရရှိပါပြီ။\n\n"
+        "💡 သင့် Plan ကို အသက်သွင်းရန် ကျေးဇူးပြုပြီး အောက်ပါအတိုင်း လုပ်ဆောင်ပါ:\n"
+        "1️⃣ Admin ထံမှ Code ကို ရယူပါ\n"
+        "2️⃣ /verifyid <code> လို့ရိုက်ထည့်ပါ"
+    )
+    
+    # ====== ✅ Admin Notification (For info only) ======
+    for admin_id in ADMIN_IDS:
+        try:
+            await context.bot.send_message(
+                chat_id=admin_id,
+                text=f"📋 User `{user_id}` က Screenshot တင်လိုက်ပါပြီ။\n"
+                     f"(Auto-Verify System သုံးနေတာမို့ အတည်ပြုစရာမလိုပါဘူး)"
+            )
+            await context.bot.send_photo(
+                chat_id=admin_id,
+                photo=file_id,
+                caption=f"📸 Proof from User {user_id}\n\n"
+                        f"✅ ဒီ User အတွက် Code ထုတ်ပေးရန်:\n"
+                        f"/gen_code {user_id} <plan>"
+            )
+        except Exception as e:
+            logger.error(f"Admin notification error for {admin_id}: {e}")
 
 async def image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
