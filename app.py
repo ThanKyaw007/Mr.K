@@ -297,7 +297,7 @@ def init_db():
     c.execute("""CREATE TABLE IF NOT EXISTS habits (
         user_id TEXT, habit TEXT, created_at TEXT
     )""")
-        c.execute("""CREATE TABLE IF NOT EXISTS response_cache (
+    c.execute("""CREATE TABLE IF NOT EXISTS response_cache (
         query TEXT PRIMARY KEY,
         response TEXT,
         created_at TEXT
@@ -408,9 +408,18 @@ def get_habits(user_id):
     return results
 
 def reset_usage():
-    # ====== Response Cache (ပိုက်ဆံချွေတာရန်) ======
-def get_cached_response(query: str) -> str | None:
-    """ဆင်တူတဲ့ မေးခွန်းအတွက် အရင်ဖြေထားတဲ့ အဖြေကို ရှာမယ်"""
+    try:
+        conn = sqlite3.connect("bot_users.db")
+        c = conn.cursor()
+        c.execute("UPDATE users SET usage_count = 0")
+        conn.commit()
+        conn.close()
+        logger.info("✅ Monthly usage reset completed successfully.")
+    except Exception as e:
+        logger.error(f"❌ Usage reset error: {e}")
+
+# ====== Response Cache (ပိုက်ဆံချွေတာရန်) ======
+def get_cached_response(query: str):
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
     c.execute("SELECT response FROM response_cache WHERE query=?", (query,))
@@ -419,7 +428,6 @@ def get_cached_response(query: str) -> str | None:
     return result[0] if result else None
 
 def save_cached_response(query: str, response: str):
-    """အဖြေအသစ်ကို Cache ထဲ သိမ်းမယ်"""
     conn = sqlite3.connect("bot_users.db")
     c = conn.cursor()
     c.execute(
