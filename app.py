@@ -977,18 +977,28 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await update.message.reply_text(
+   await update.message.reply_text(
         "🙏 မင်္ဂလာပါ။ ကျွန်တော် မစ္စတာသန်းပါ။\n"
         "သင့်ရဲ့ လက်ထောက် အဖြစ်နဲ့ ကိုယ်ရေးကိုယ်တာ၊ အလုပ်အကိုင်နဲ့ "
         "တခြားလုပ်ဆောင်ရမယ့် အရာတွေကို ယုံကြည်စွာ ဖြေရှင်းပေးဖို့ အသင့်ပါဗျ။\n\n"
-        "🚀 စတင်အသုံးပြုရန် အောက်ပါခလုတ်ကို နှိပ်ပါ။",
-        reply_markup=reply_markup
+        "Commands:\n"
+        "/subscribe <plan> - Plan ပြောင်းရန် (free/basic/premium/premium_plus)\n"
+        "/ask <question> - AI ကို မေးမြန်းရန်\n"
+        "/status - ကိုယ့် Plan နှင့် သုံးခွင့်အကြွင်းကို ကြည့်ရန်\n"
+        "/proof - Screenshot proof တင်ရန် (Photo ပို့ပါ)\n"
+        "/referral - သင့် referral link ရယူရန်\n"   # 👈 ဒီမှာ ထည့်ပါ
+        "/profile <field> : <value> - Profile သိမ်းရန်\n"
+        "/habit <habit> - Habit ထည့်ရန်\n"
+        "/myhabits - သင့် habits စာရင်းကြည့်ရန်\n"
+        "/help - အကူအညီ\n\n"
+        "💡 သိကောင်းစရာ: အခမဲ့ သုံးချင်ရင် `/subscribe free` နှိပ်ပါ။"
     )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "📌 အသုံးပြုနည်း:\n/start - စတင်ရန်\n/help - အကူအညီ\n/subscribe - Plan ရွေးရန်\n/ask <q> - မေးရန်\n/status - အနေအထား\n/profile - ကိုယ်ရေးမှတ်တမ်း\n/habit - အလေ့အထ\n/referral - ဖိတ်ရန်\n\n"
         "🎯 ကျွန်တော် အကြံပေးနိုင်တဲ့ နယ်ပယ် ၁၂၀+ ခုရှိပါတယ်။"
+        "/referral - သင့် referral link ရယူရန်\n"
     )
 
 async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -997,8 +1007,19 @@ async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_username = (await context.bot.get_me()).username
     ref_link = f"https://t.me/{bot_username}?start={ref_code}"
     inviter_count = get_referral_count(user_id)
-    await update.message.reply_text(f"🔗 သင့် Referral Link:\n`{ref_link}`\n\n📊 ဖိတ်ထားသူ: {inviter_count}\n✨ 50 ကြိမ် free ရပါမယ်။")
 
+    await update.message.reply_text(
+        f"🔗 **သင့် Referral Link**\n\n"
+        f"`{ref_link}`\n\n"
+        f"📊 သင်ဖိတ်ကြားထားပြီးသား သူငယ်ချင်း အရေအတွက်: **{inviter_count}**\n\n"
+        f"🎁 **ရမည့်အခွင့်အရေး:**\n"
+        f"👉 သူငယ်ချင်းတစ်ယောက် ဒီလင့်ကနေ ဝင်သုံးတိုင်း **သင် ၅၀ ကြိမ် အပိုသုံးခွင့် ရပါမယ်။**\n"
+        f"👉 ဒါမှမဟုတ် ပိုမိုသုံးစွဲလိုပါက အောက်ပါ Plan များကို ဝယ်ယူနိုင်ပါတယ်:\n"
+        f"⭐ **Basic (10,000 MMK)**\n"
+        f"💎 **Premium (30,000 MMK)**\n"
+        f"👑 **Premium+ (50,000 MMK)**\n\n"
+        f"📌 မျှဝေပြီး အပိုသုံးခွင့်ရယူလိုက်ပါ!"
+    )
 async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     plan = context.args[0] if context.args else "free"
@@ -1123,7 +1144,16 @@ async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if not check_limit(user_id):
-        await update.message.reply_text("❌ သုံးခွင့်ကုန်သွားပါပြီ။ Plan အသစ်ရွေးပါ။")
+                keyboard = [[InlineKeyboardButton("⭐ Plan ရွေးရန်", callback_data="start_plan")]]
+        await update.message.reply_text(
+            "❌ **သင့် Free Plan ၏ သုံးခွင့် ကုန်သွားပါပြီ။**\n\n"
+            "🚀 ဆက်လက်သုံးစွဲရန် အောက်ပါ Plan များထဲမှ တစ်ခုကို ရွေးချယ်ပါ:\n"
+            "⭐ **Basic (10,000 MMK)**\n"
+            "💎 **Premium (30,000 MMK)**\n"
+            "👑 **Premium+ (50,000 MMK)**\n\n"
+            "📸 ငွေလွှဲပြီး Proof ဓာတ်ပုံ ပို့ပေးပါ။",
+            reply_markup=keyboard
+        )
         return
 
     if not context.args:
@@ -1575,7 +1605,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if chat_type == "private":
         if not check_limit(user_id):
-            await update.message.reply_text("❌ သုံးခွင့်ကုန်သွားပါပြီ။ Plan အသစ်ရွေးပါ။")
+                keyboard = [[InlineKeyboardButton("⭐ Plan ရွေးရန်", callback_data="start_plan")]]
+        await update.message.reply_text(
+            "❌ **သင့် Free Plan ၏ သုံးခွင့် ကုန်သွားပါပြီ။**\n\n"
+            "🚀 ဆက်လက်သုံးစွဲရန် အောက်ပါ Plan များထဲမှ တစ်ခုကို ရွေးချယ်ပါ:\n"
+            "⭐ **Basic (10,000 MMK)**\n"
+            "💎 **Premium (30,000 MMK)**\n"
+            "👑 **Premium+ (50,000 MMK)**\n\n"
+            "📸 ငွေလွှဲပြီး Proof ဓာတ်ပုံ ပို့ပေးပါ။",
+            reply_markup=keyboard
+        )
             return
 
         if "သတင်း" in text or "news" in text.lower():
