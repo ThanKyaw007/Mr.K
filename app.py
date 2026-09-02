@@ -1328,9 +1328,9 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [
         [InlineKeyboardButton("📌 Free (အခမဲ့)", callback_data="sub_free")],
-        [InlineKeyboardButton("⭐ Basic (10,000 MMK)", callback_data="sub_basic")],
-        [InlineKeyboardButton("💎 Premium (30,000 MMK)", callback_data="sub_premium")],
-        [InlineKeyboardButton("👑 Premium+ (50,000 MMK)", callback_data="sub_premium_plus")],
+        [InlineKeyboardButton("⭐ Basic (7,000 MMK)", callback_data="sub_basic")],
+        [InlineKeyboardButton("💎 Premium (20,000 MMK)", callback_data="sub_premium")],
+        [InlineKeyboardButton("👑 Premium+ (35,000 MMK)", callback_data="sub_premium_plus")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -1630,10 +1630,10 @@ async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "❌ **သင့် Free Plan ၏ သုံးခွင့် ကုန်သွားပါပြီ။**\n\n"
             "🚀 ဆက်လက်သုံးစွဲရန် အောက်ပါ Plan များထဲမှ တစ်ခုကို ရွေးချယ်ပါ:\n"
-            "⭐ **Basic (10,000 MMK)**\n"
-            "💎 **Premium (30,000 MMK)**\n"
-            "👑 **Premium+ (50,000 MMK)**\n\n"
-            "📸 ငွေလွှဲပြီး Proof ဓာတ်ပုံ ပို့ပေးပါ။",
+            "⭐ **Basic (7,000 MMK)**\n"
+            "💎 **Premium (20,000 MMK)**\n"
+            "👑 **Premium+ (35,000 MMK)**\n\n"
+            "📸 ငွေလွှဲပြီး Proof ဓာတ်ပုံ ပို့ပေးပါ။"
             reply_markup=reply_markup
         )
         return
@@ -2138,10 +2138,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(
                 "❌ **သင့် Free Plan ၏ သုံးခွင့် ကုန်သွားပါပြီ။**\n\n"
                 "🚀 ဆက်လက်သုံးစွဲရန် အောက်ပါ Plan များထဲမှ တစ်ခုကို ရွေးချယ်ပါ:\n"
-                "⭐ **Basic (10,000 MMK)**\n"
-                "💎 **Premium (30,000 MMK)**\n"
-                "👑 **Premium+ (50,000 MMK)**\n\n"
-                "📸 ငွေလွှဲပြီး Proof ဓာတ်ပုံ ပို့ပေးပါ။",
+                "⭐ **Basic (7,000 MMK)**\n"
+                "💎 **Premium (20,000 MMK)**\n"
+                "👑 **Premium+ (35,000 MMK)**\n\n"
+                "📸 ငွေလွှဲပြီး Proof ဓာတ်ပုံ ပို့ပေးပါ။"
                 reply_markup=reply_markup
             )
             return
