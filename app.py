@@ -479,13 +479,6 @@ def reset_usage():
         logger.error(f"❌ Usage reset error: {e}")
 
 # ====== Response Cache ======
-def get_cached_response(query: str):
-    conn = sqlite3.connect("bot_users.db", check_same_thread=False)
-    c = conn.cursor()
-    c.execute("SELECT response FROM response_cache WHERE query=?", (query,))
-    result = c.fetchone()
-    conn.close()
-    return result[0] if result else None
 
 def save_cached_response(query: str, response: str):
     conn = sqlite3.connect("bot_users.db", check_same_thread=False)
