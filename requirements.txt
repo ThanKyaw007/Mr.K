@@ -5,3 +5,5 @@ httpx
 schedule
 easyocr
 Pillow
+python-docx
+gtts
