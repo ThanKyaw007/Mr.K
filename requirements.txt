@@ -1,9 +1,7 @@
-Flask
-python-telegram-bot==20.0
-requests
-httpx
-schedule
-easyocr
-Pillow
-python-docx
-gtts
+python-telegram-bot==20.7
+flask==2.3.3
+httpx==0.25.0
+schedule==1.2.0
+pytz==2024.1
+gTTS==2.3.2
+python-docx==1.1.0
