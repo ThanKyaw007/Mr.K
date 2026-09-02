@@ -12,6 +12,8 @@ import logging
 import schedule
 import time
 import xml.etree.ElementTree as ET
+import re
+from datetime import datetime
 from docx import Document
 from gtts import gTTS
 from datetime import datetime
@@ -286,6 +288,133 @@ def backup_and_send(bot):
         logger.error(f"❌ Backup error: {e}")
 
 # ====== Database Functions ======
+# ====== Database: Add transactions table ======
+def init_db():
+    conn = sqlite3.connect("bot_users.db", check_same_thread=False)
+    c = conn.cursor()
+    
+    # ... existing tables ...
+    
+    # ✅ New table for auto-verify
+    c.execute("""CREATE TABLE IF NOT EXISTS transactions (
+        tx_id TEXT PRIMARY KEY,
+        user_id TEXT,
+        plan TEXT,
+        timestamp TEXT,
+        used BOOLEAN DEFAULT 0
+    )""")
+    
+    conn.commit()
+    conn.close()
+    logger.info("✅ Database initialized successfully.")
+
+
+# ====== Auto Verify Payment ======
+def auto_verify_payment(user_id: str, tx_id: str, plan: str) -> bool:
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+
+        # Check if transaction exists and not used
+        c.execute("SELECT used FROM transactions WHERE tx_id=? AND user_id=?", (tx_id, user_id))
+        row = c.fetchone()
+        if not row:
+            conn.close()
+            return False
+        if row[0] == 1:  # already used
+            conn.close()
+            return False
+
+        # Mark as used
+        c.execute("UPDATE transactions SET used=1 WHERE tx_id=? AND user_id=?", (tx_id, user_id))
+        
+        # Upgrade user plan
+        price = PLAN_LIMITS[plan]["price"]
+        c.execute("UPDATE users SET plan=?, proof_status='approved', usage_count=0, price=? WHERE user_id=?",
+                  (plan, price, user_id))
+        conn.commit()
+        conn.close()
+        logger.info(f"✅ Auto-verified: user={user_id}, tx={tx_id}, plan={plan}")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Auto verify error: {e}")
+        return False
+
+
+# ====== Admin: Generate Transaction Code ======
+async def gen_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    if user_id not in [str(a) for a in ADMIN_IDS]:
+        return await update.message.reply_text("❌ Admin only.")
+    
+    if len(context.args) < 2:
+        return await update.message.reply_text("Usage: /gen_code <user_id> <plan>")
+    
+    target_user = context.args[0]
+    plan = context.args[1].lower()
+    
+    if plan not in PLAN_LIMITS:
+        return await update.message.reply_text("❌ Invalid plan.")
+    
+    # Generate 5-digit unique code
+    import random
+    for _ in range(5):  # try 5 times
+        tx_id = f"{random.randint(0, 99999):05d}"
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT tx_id FROM transactions WHERE tx_id=?", (tx_id,))
+        if not c.fetchone():
+            break
+        conn.close()
+    
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("INSERT INTO transactions (tx_id, user_id, plan, timestamp, used) VALUES (?, ?, ?, ?, ?)",
+              (tx_id, target_user, plan, datetime.utcnow().isoformat(), 0))
+    conn.commit()
+    conn.close()
+    
+    await update.message.reply_text(
+        f"✅ Code generated:\n"
+        f"User: {target_user}\n"
+        f"Plan: {plan}\n"
+        f"Code: `{tx_id}`\n\n"
+        f"User can verify with: /verifyid {tx_id}"
+    )
+
+
+# ====== User: Self-Verify ======
+async def verifyid(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    
+    if len(context.args) < 1:
+        return await update.message.reply_text("Usage: /verifyid <transaction_code>")
+    
+    tx_id = context.args[0]
+    
+    # ✅ Must be 5 digits
+    if not re.match(r"^\d{5}$", tx_id):
+        return await update.message.reply_text("❌ Invalid transaction code. Must be exactly 5 digits.")
+    
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT plan FROM transactions WHERE tx_id=? AND user_id=?", (tx_id, user_id))
+    row = c.fetchone()
+    conn.close()
+    
+    if not row:
+        return await update.message.reply_text("❌ Transaction code not found or not assigned to you.")
+    
+    plan = row[0]
+    success = auto_verify_payment(user_id, tx_id, plan)
+    
+    if success:
+        await update.message.reply_text(
+            f"✅ Transaction {tx_id} verified.\n🎉 Your plan upgraded to {plan}."
+        )
+    else:
+        await update.message.reply_text("❌ Transaction code already used or error occurred.")
+        
 def init_db():
     conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
