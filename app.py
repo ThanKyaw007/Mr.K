@@ -944,9 +944,11 @@ async def send_daily_coaching(bot):
 # ====== Scheduler ======
 def run_scheduler(bot):
     schedule.every(30).days.do(reset_usage)
-    schedule.every().day.at("08:00").do(lambda: asyncio.run(send_daily_coaching(bot)))
-    schedule.every().day.at("03:00").do(lambda: backup_and_send(bot))
-    logger.info("⏰ Scheduler started.")
+    # မြန်မာအချိန် မနက် ၈ နာရီ = UTC မနက် ၁ နာရီခွဲ (01:30)
+    schedule.every().day.at("01:30").do(lambda: asyncio.run(send_daily_coaching(bot)))
+    # မြန်မာအချိန် မနက် ၃ နာရီ = UTC ညနေ ၈ နာရီခွဲ (20:30)
+    schedule.every().day.at("20:30").do(lambda: backup_and_send(bot))
+    logger.info("⏰ Scheduler started (Myanmar Time UTC+6:30).")
     while True:
         schedule.run_pending()
         time.sleep(60)
