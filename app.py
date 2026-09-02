@@ -1708,6 +1708,33 @@ async def news_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await fetch_news(update, context)
 
 # ====== Admin Commands ======
+async def pending_requests(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    if user_id not in [str(a) for a in ADMIN_IDS]:
+        return await update.message.reply_text("❌ Admin only.")
+    
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT user_id, plan FROM users WHERE proof_status='waiting' AND plan != 'free'")
+    results = c.fetchall()
+    conn.close()
+    
+    if not results:
+        return await update.message.reply_text("📭 လက်ရှိ Pending Requests မရှိပါဘူး။")
+    
+    keyboard = []
+    for uid, plan in results:
+        button_text = f"📤 Send Code to {uid} ({plan})"
+        callback_data = f"send_code_{uid}_{plan}"
+        keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(
+        "📋 **Pending Plan Requests**\n\n"
+        "အောက်ပါ User တွေအတွက် Code ထုတ်ပေးရန် ခလုတ်ကို နှိပ်ပါ။",
+        reply_markup=reply_markup
+    )
+    
 async def verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     if user_id not in [str(a) for a in ADMIN_IDS]:
