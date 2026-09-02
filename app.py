@@ -89,7 +89,6 @@ def get_plan_price(plan, duration="1m"):
 def get_duration_label(duration):
     labels = {"1m": "၁ လ", "3m": "၃ လ", "12m": "၁၂ လ"}
     return labels.get(duration, duration)
-}
 
 def get_price_usd(price_mmk):
     return round(price_mmk / EXCHANGE_RATE, 2)
