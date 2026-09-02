@@ -907,7 +907,7 @@ async def send_daily_coaching(bot):
 def run_scheduler(bot):
     schedule.every(30).days.do(reset_usage)
     schedule.every().day.at("08:00").do(lambda: asyncio.run(send_daily_coaching(bot)))
-    schedule.every().day.at("03:00").do(lambda: asyncio.run(backup_and_send(bot)))
+    schedule.every().day.at("03:00").do(lambda: backup_and_send(bot))
     logger.info("⏰ Scheduler started.")
     while True:
         schedule.run_pending()
