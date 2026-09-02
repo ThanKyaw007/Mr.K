@@ -1676,7 +1676,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
             try:
                 short_prompt = f"Group chat ဖြစ်လို့ တိုတိုနဲ့ ဖြေပါ။ {text}"
-                answer = await ask_model(short_prompt)  # ✅ Argument ၁ ခုပဲ
+                answer = await ask_model(short_prompt, user_id)  # user_id ကိုပါ ထည့်ပါ
                 answer = clean_text(answer)
             except Exception as e:
                 logger.error(f"Group message error: {e}")
@@ -1709,7 +1709,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # ✅ ပြင်ဆင်ပြီး (Argument ၁ ခုပဲ ပို့တယ်)
         await update.message.reply_text("🤔 စဉ်းစားနေပါတယ်...")
         try:
-            answer = await ask_model(text)  # ✅ Argument ၁ ခုပဲ
+            answer = await ask_model(text, user_id)  # user_id ကိုပါ ထည့်ပါ
             answer = clean_text(answer)
         except Exception as e:
             logger.error(f"Handle message error: {e}")
