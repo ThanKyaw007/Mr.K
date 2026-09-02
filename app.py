@@ -1031,8 +1031,8 @@ def run_scheduler(bot):
     mm_tz = pytz.timezone("Asia/Yangon")
     now_mm = datetime.now(mm_tz)
     
-    schedule.every().day.at("08:00").do(lambda: asyncio.create_task(send_daily_coaching(bot)))  # Myanmar 8AM
-    schedule.every().day.at("03:00").do(lambda: backup_and_send(bot))  # Myanmar 3AM
+    schedule.every().day.at("08:00").do(lambda: asyncio.run(send_daily_coaching(bot)))  # ✅ asyncio.run သုံးပါ
+    schedule.every().day.at("03:00").do(lambda: backup_and_send(bot))
     
     logger.info("⏰ Scheduler started (Myanmar Time).")
     while True:
