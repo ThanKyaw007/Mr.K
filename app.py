@@ -838,12 +838,37 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # အသစ်ထည့်ထားတဲ့ Start Buttons အတွက် Logic
     if data == "start_plan":
         # Plan ရွေးတဲ့ UI ကို တိုက်ရိုက်ပြပေးမယ်
-        await subscribe(update, context)  # subscribe function ကို ခေါ်လိုက်တာ
+        keyboard = [
+            [InlineKeyboardButton("📌 Free (အခမဲ့)", callback_data="sub_free")],
+            [InlineKeyboardButton("⭐ Basic (10,000 MMK)", callback_data="sub_basic")],
+            [InlineKeyboardButton("💎 Premium (30,000 MMK)", callback_data="sub_premium")],
+            [InlineKeyboardButton("👑 Premium+ (50,000 MMK)", callback_data="sub_premium_plus")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            "📌 အောက်ပါ Plan များမှ ရွေးချယ်ပါ။\n\n"
+            "📌 Free (အခမဲ့)\n"
+            "⭐ Basic (10,000 MMK)\n"
+            "💎 Premium (30,000 MMK)\n"
+            "👑 Premium+ (50,000 MMK) (VIP)",
+            reply_markup=reply_markup
+        )
         return
 
     if data == "start_help":
         # Help Command ကို ပြပေးမယ်
-        await help_command(update, context)
+        await query.edit_message_text(
+            "📌 အသုံးပြုနည်း:\n"
+            "/start - စတင်ရန်\n"
+            "/help - အကူအညီ\n"
+            "/subscribe - Plan ရွေးရန်\n"
+            "/ask <q> - မေးရန်\n"
+            "/status - အနေအထား\n"
+            "/profile - ကိုယ်ရေးမှတ်တမ်း\n"
+            "/habit - အလေ့အထ\n"
+            "/referral - ဖိတ်ရန်\n\n"
+            "🎯 ကျွန်တော် အကြံပေးနိုင်တဲ့ နယ်ပယ် ၄၅ ခုရှိပါတယ်။"
+        )
         return
 
     # အောက်က မူရင်း Subscription Logic တွေ ဆက်လက်အလုပ်လုပ်နေမှာပါ
