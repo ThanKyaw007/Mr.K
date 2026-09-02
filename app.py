@@ -1345,6 +1345,76 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await query.edit_message_text(text)
 
+    if data.startswith("send_code_"):
+        if user_id not in [str(a) for a in ADMIN_IDS]:
+            await query.edit_message_text("❌ Admin only.")
+            return
+        
+        # data က "send_code_123456789_premium" လိုမျိုး ဖြစ်မယ်
+        parts = data.split("_", 2)
+        if len(parts) < 3:
+            await query.edit_message_text("❌ Invalid request.")
+            return
+        
+        target_user = parts[1]
+        plan = parts[2]
+        
+        # Generate unique 5-digit code
+        import random
+        tx_id = None
+        for _ in range(10):
+            candidate = f"{random.randint(0, 99999):05d}"
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("SELECT tx_id FROM transactions WHERE tx_id=?", (candidate,))
+            exists = c.fetchone()
+            conn.close()
+            if not exists:
+                tx_id = candidate
+                break
+        
+        if not tx_id:
+            await query.edit_message_text("❌ Code ထုတ်လို့မရပါဘူး။ နောက်တစ်ခါ ကြိုးစားပါ။")
+            return
+        
+        # 1 day expiry
+        expiry_date = (datetime.utcnow() + timedelta(days=1)).isoformat()
+        
+        # Save to database
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("INSERT INTO transactions (tx_id, user_id, plan, timestamp, used, expiry_date) VALUES (?, ?, ?, ?, ?, ?)",
+                  (tx_id, target_user, plan, datetime.utcnow().isoformat(), 0, expiry_date))
+        conn.commit()
+        conn.close()
+        
+        # Send code to user
+        try:
+            await context.bot.send_message(
+                chat_id=int(target_user),
+                text=f"🎫 **သင့် {plan.upper()} Plan အတွက် Code ပါ။**\n\n"
+                     f"🔑 Code: `{tx_id}`\n"
+                     f"⏰ သက်တမ်း: ၂၄ နာရီ\n\n"
+                     f"📌 /verifyid {tx_id} လို့ရိုက်ပြီး Plan ရယူပါ။"
+            )
+            await query.edit_message_text(
+                f"✅ Code `{tx_id}` ကို User `{target_user}` ဆီ ပို့ပြီးပါပြီ။\n"
+                f"📌 Plan: {plan}"
+            )
+        except Exception as e:
+            await query.edit_message_text(
+                f"⚠️ User `{target_user}` ဆီ ပို့လို့မရပါဘူး။\n"
+                f"Code: `{tx_id}` ကို ကိုယ်တိုင်ပို့ပေးပါ။"
+            )
+        
+        # Update user's proof_status
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("UPDATE users SET proof_status='pending' WHERE user_id=?", (target_user,))
+        conn.commit()
+        conn.close()
+        return
+
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     user = get_user(user_id)
@@ -1951,11 +2021,14 @@ def main():
     application.add_handler(CommandHandler("verifyid", verifyid))      # User self-verify
     
     # Admin Commands
+    application.add_handler(CommandHandler("pending_requests", pending_requests))  
     application.add_handler(CommandHandler("verify", verify))
     application.add_handler(CommandHandler("pending_proofs", pending_proofs))
     application.add_handler(CommandHandler("approve_proof", approve_proof))
     application.add_handler(CommandHandler("reject_proof", reject_proof))
     application.add_handler(CommandHandler("broadcast", broadcast))
+    application.add_handler(CommandHandler("gen_code", gen_code))
+    application.add_handler(CommandHandler("verifyid", verifyid))
     
     # Callback & Message Handlers
     application.add_handler(CallbackQueryHandler(button_handler))
