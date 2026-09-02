@@ -13,6 +13,9 @@ import schedule
 import time
 import xml.etree.ElementTree as ET
 import re
+import random
+import time
+from datetime import datetime, timedelta
 from datetime import datetime
 from docx import Document
 from gtts import gTTS
@@ -289,57 +292,76 @@ def backup_and_send(bot):
 
 # ====== Database Functions ======
 # ====== Database: Add transactions table ======
+# ====== Database: Add transactions table with expiry ======
 def init_db():
     conn = sqlite3.connect("bot_users.db", check_same_thread=False)
     c = conn.cursor()
     
     # ... existing tables ...
     
-    # ✅ New table for auto-verify
+    # ✅ New table for auto-verify with expiry
     c.execute("""CREATE TABLE IF NOT EXISTS transactions (
         tx_id TEXT PRIMARY KEY,
         user_id TEXT,
         plan TEXT,
         timestamp TEXT,
-        used BOOLEAN DEFAULT 0
+        used BOOLEAN DEFAULT 0,
+        expiry_date TEXT
     )""")
+    
+    c.execute("CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_transactions_plan ON transactions(plan)")
     
     conn.commit()
     conn.close()
     logger.info("✅ Database initialized successfully.")
 
+# ====== Rate Limiting ======
+verify_attempts = {}
 
 # ====== Auto Verify Payment ======
-def auto_verify_payment(user_id: str, tx_id: str, plan: str) -> bool:
+async def auto_verify_payment(user_id: str, tx_id: str, plan: str, bot) -> bool:
     try:
         conn = get_db_connection()
         c = conn.cursor()
 
-        # Check if transaction exists and not used
-        c.execute("SELECT used FROM transactions WHERE tx_id=? AND user_id=?", (tx_id, user_id))
+        c.execute("SELECT used, expiry_date FROM transactions WHERE tx_id=? AND user_id=?", (tx_id, user_id))
         row = c.fetchone()
         if not row:
             conn.close()
             return False
-        if row[0] == 1:  # already used
+        
+        used, expiry_date = row
+        if used == 1:
+            conn.close()
+            return False
+        
+        if expiry_date and datetime.utcnow().isoformat() > expiry_date:
             conn.close()
             return False
 
-        # Mark as used
         c.execute("UPDATE transactions SET used=1 WHERE tx_id=? AND user_id=?", (tx_id, user_id))
-        
-        # Upgrade user plan
         price = PLAN_LIMITS[plan]["price"]
         c.execute("UPDATE users SET plan=?, proof_status='approved', usage_count=0, price=? WHERE user_id=?",
                   (plan, price, user_id))
         conn.commit()
         conn.close()
+        
+        # Admin notification
+        for admin_id in ADMIN_IDS:
+            try:
+                await bot.send_message(
+                    chat_id=admin_id,
+                    text=f"📋 Auto-verify completed!\nUser: {user_id}\nPlan: {plan}\nCode: {tx_id}"
+                )
+            except Exception as e:
+                logger.error(f"Admin notification error: {e}")
+        
         logger.info(f"✅ Auto-verified: user={user_id}, tx={tx_id}, plan={plan}")
         return True
     except Exception as e:
         logger.error(f"❌ Auto verify error: {e}")
         return False
-
 
 # ====== Admin: Generate Transaction Code ======
 async def gen_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -356,21 +378,28 @@ async def gen_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if plan not in PLAN_LIMITS:
         return await update.message.reply_text("❌ Invalid plan.")
     
-    # Generate 5-digit unique code
-    import random
-    for _ in range(5):  # try 5 times
-        tx_id = f"{random.randint(0, 99999):05d}"
+    tx_id = None
+    for _ in range(10):
+        candidate = f"{random.randint(0, 99999):05d}"
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("SELECT tx_id FROM transactions WHERE tx_id=?", (tx_id,))
-        if not c.fetchone():
-            break
+        c.execute("SELECT tx_id FROM transactions WHERE tx_id=?", (candidate,))
+        exists = c.fetchone()
         conn.close()
+        if not exists:
+            tx_id = candidate
+            break
+    
+    if not tx_id:
+        return await update.message.reply_text("❌ Failed to generate unique code. Try again.")
+    
+    # ✅ ၇ ရက်ကနေ ၁ ရက်ကို ပြောင်းပါ
+    expiry_date = (datetime.utcnow() + timedelta(days=1)).isoformat()  # 1 day
     
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("INSERT INTO transactions (tx_id, user_id, plan, timestamp, used) VALUES (?, ?, ?, ?, ?)",
-              (tx_id, target_user, plan, datetime.utcnow().isoformat(), 0))
+    c.execute("INSERT INTO transactions (tx_id, user_id, plan, timestamp, used, expiry_date) VALUES (?, ?, ?, ?, ?, ?)",
+              (tx_id, target_user, plan, datetime.utcnow().isoformat(), 0, expiry_date))
     conn.commit()
     conn.close()
     
@@ -378,42 +407,33 @@ async def gen_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"✅ Code generated:\n"
         f"User: {target_user}\n"
         f"Plan: {plan}\n"
-        f"Code: `{tx_id}`\n\n"
+        f"Code: `{tx_id}`\n"
+        f"Expires: {expiry_date[:10]} (1 day)\n\n"
         f"User can verify with: /verifyid {tx_id}"
     )
 
+# ====== Auto Verify Payment ======
+async def auto_verify_payment(user_id: str, tx_id: str, plan: str, bot) -> bool:
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
 
-# ====== User: Self-Verify ======
-async def verifyid(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    
-    if len(context.args) < 1:
-        return await update.message.reply_text("Usage: /verifyid <transaction_code>")
-    
-    tx_id = context.args[0]
-    
-    # ✅ Must be 5 digits
-    if not re.match(r"^\d{5}$", tx_id):
-        return await update.message.reply_text("❌ Invalid transaction code. Must be exactly 5 digits.")
-    
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT plan FROM transactions WHERE tx_id=? AND user_id=?", (tx_id, user_id))
-    row = c.fetchone()
-    conn.close()
-    
-    if not row:
-        return await update.message.reply_text("❌ Transaction code not found or not assigned to you.")
-    
-    plan = row[0]
-    success = auto_verify_payment(user_id, tx_id, plan)
-    
-    if success:
-        await update.message.reply_text(
-            f"✅ Transaction {tx_id} verified.\n🎉 Your plan upgraded to {plan}."
-        )
-    else:
-        await update.message.reply_text("❌ Transaction code already used or error occurred.")
+        c.execute("SELECT used, expiry_date FROM transactions WHERE tx_id=? AND user_id=?", (tx_id, user_id))
+        row = c.fetchone()
+        if not row:
+            conn.close()
+            return False
+        
+        used, expiry_date = row
+        if used == 1:
+            conn.close()
+            return False
+        
+        # ✅ ဒီနေရာက အတိုင်းသားပါ (1 day ဖြစ်သွားပြီ)
+        if expiry_date and datetime.utcnow().isoformat() > expiry_date:
+            conn.close()
+            return False
+
         
 def init_db():
     conn = sqlite3.connect("bot_users.db", check_same_thread=False)
