@@ -500,7 +500,9 @@ LOCAL_RESPONSES = {
     "နက္ခတ်ဗေဒင်": "နက္ခတ်ဗေဒင်အသေးစိတ်ကို /ask မှာ မေးပါ။",
     "မွေးနေ့": "မွေးနေ့နဲ့ ကံကြမ္မာသိချင်ရင် /profile birthdate : <သင့်မွေးနေ့> ထည့်ပြီး /ask မှာ မေးပါ။",
     "ကံကြမ္မာ": "ကံကြမ္မာဖတ်ချင်ရင် မွေးနေ့လိုအပ်လို့ /profile birthdate : <သင့်မွေးနေ့> ထည့်ပါ။",
-    "အတိတ်နိမိတ်": "အတိတ်နိမိတ် (ဥပမာ - ကြောင်နှာချေခြင်း၊ ငှက်မြည်ခြင်း) အကြောင်း သိချင်ရင် /ask မှာ မေးပါ။"
+    "အတိတ်နိမိတ်": "အတိတ်နိမိတ် (ဥပမာ - ကြောင်နှာချေခြင်း၊ ငှက်မြည်ခြင်း) အကြောင်း သိချင်ရင် /ask မှာ မေးပါ။",
+    
+    # ရာသီဥတု (Weather)
         # ရာသီဥတု (Weather)
     "ရာသီဥတု": "ရာသီဥတုအခြေအနေကို ခန့်မှန်းဖို့ /ask မှာ သင့်မြို့နယ်ကို ထည့်ပြီး မေးပါ။",
     "မိုးရွာမလား": "မိုးရွာနိုင်ခြေကို /ask မှာ သင့်တည်နေရာထည့်ပြီး မေးကြည့်ပါဗျ။",
@@ -672,6 +674,34 @@ def run_scheduler(bot):
 
 # ====== Telegram Bot Command Handlers ======
 
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    if context.args:
+        ref_code = context.args[0]
+        if ref_code.startswith("REF"):
+            inviter_id = ref_code.replace("REF", "")
+            if inviter_id != user_id:
+                give_referral_reward(inviter_id, user_id)
+
+    user = get_user(user_id)
+    if not user:
+        add_user(user_id, "free")
+
+    # Button နှစ်ခု ထည့်ထားပါတယ်
+    keyboard = [
+        [InlineKeyboardButton("📌 Plan ရွေးရန် (စတင်ရန်)", callback_data="start_plan")],
+        [InlineKeyboardButton("ℹ️ လမ်းညွှန်ချက်များ (Help)", callback_data="start_help")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        "🙏 မင်္ဂလာပါ။ ကျွန်တော် မစ္စတာသန်းပါ။\n"
+        "သင့်ရဲ့ လက်ထောက် အဖြစ်နဲ့ ကိုယ်ရေးကိုယ်တာ၊ အလုပ်အကိုင်နဲ့ "
+        "တခြားလုပ်ဆောင်ရမယ့် အရာတွေကို ယုံကြည်စွာ ဖြေရှင်းပေးဖို့ အသင့်ပါဗျ။\n\n"
+        "🚀 စတင်အသုံးပြုရန် အောက်ပါခလုတ်ကို နှိပ်ပါ။",
+        reply_markup=reply_markup
+    )
+    
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "📌 အသုံးပြုနည်း:\n/start - စတင်ရန်\n/help - အကူအညီ\n/subscribe - Plan ရွေးရန်\n/ask <q> - မေးရန်\n/status - အနေအထား\n/profile - ကိုယ်ရေးမှတ်တမ်း\n/habit - အလေ့အထ\n/referral - ဖိတ်ရန်\n\n"
