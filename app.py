@@ -1957,11 +1957,11 @@ async def news_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """📅 နေ့စဉ်အချက်အလက်များ - သတင်း၊ ဗေဒင်၊ ကိုးကားချက်"""
     user_id = str(update.effective_user.id)
-    
+
     # ၁. သုံးစွဲသူရဲ့ မွေးနေ့ကို ယူမယ်
     user_data = get_user(user_id)
     birthdate = user_data[12] if user_data and len(user_data) > 12 else None
-    
+
     # ၂. သတင်းတွေ ယူမယ်
     news_text = ""
     try:
@@ -1978,7 +1978,7 @@ async def daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 news_text += f"{i}. {title}\n"
     except Exception:
         news_text = "📰 သတင်းယူလို့မရပါဘူး။"
-    
+
     # ၃. ဗေဒင်ဟောချက်
     astrology_text = ""
     if birthdate:
@@ -1993,7 +1993,7 @@ async def daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
             astrology_text = "🔮 ဗေဒင်ယူလို့မရပါဘူး။"
     else:
         astrology_text = "🔮 ဗေဒင်ဟောချက်အတွက် ကျေးဇူးပြုပြီး `/profile birthdate : YYYY-MM-DD` နဲ့ မွေးနေ့သိမ်းပါ။"
-    
+
     # ၄. နေ့စဉ်ကိုးကားချက်
     quote_text = ""
     try:
@@ -2005,7 +2005,7 @@ async def daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
         quote_text = "💡 **နေ့စဉ်ကိုးကားချက်**\n" + quote[:200]
     except Exception:
         quote_text = "💡 ကိုးကားချက်ယူလို့မရပါဘူး။"
-    
+
     # ၅. အားလုံးကို ပေါင်းပြီး ပြန်ပေးမယ်
     final_message = (
         f"📅 **နေ့စဉ်အချက်အလက်များ**\n\n"
@@ -2013,9 +2013,8 @@ async def daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"{astrology_text}\n\n"
         f"{quote_text}"
     )
-    
-    await update.message.reply_text(final_message, disable_web_page_preview=True)
 
+    await update.message.reply_text(final_message, disable_web_page_preview=True)
 # ====== Admin Commands ======
 async def pending_requests(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
