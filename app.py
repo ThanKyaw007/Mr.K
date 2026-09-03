@@ -82,6 +82,13 @@ PLAN_LIMITS = {
         "prices": {"1m": 35000, "3m": 87500, "12m": 280000}
     }
 }
+# ====== Feature Limits for Image Generation ======
+IMAGE_LIMITS = {
+    "free": 5,
+    "basic": 100,
+    "premium": 500,
+    "premium_plus": 2000
+}
 
 def get_plan_price(plan, duration="1m"):
     return PLAN_LIMITS[plan]["prices"].get(duration, PLAN_LIMITS[plan]["price"])
