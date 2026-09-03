@@ -1339,8 +1339,8 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "⭐ **Basic (7,000 MMK)**\n"
         "💎 **Premium (20,000 MMK)**\n"
         "👑 **Premium+ (35,000 MMK)**\n\n"
-        "📸 ငွေလွှဲပြီး Proof ဓာတ်ပုံ ပို့ပေးပါ။"
-        reply_markup=reply_markup,
+        "📸 ငွေလွှဲပြီး Proof ဓာတ်ပုံ ပို့ပေးပါ။",
+        reply_markup=reply_markup
     )
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1633,7 +1633,7 @@ async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "⭐ **Basic (7,000 MMK)**\n"
             "💎 **Premium (20,000 MMK)**\n"
             "👑 **Premium+ (35,000 MMK)**\n\n"
-            "📸 ငွေလွှဲပြီး Proof ဓာတ်ပုံ ပို့ပေးပါ။"
+            "📸 ငွေလွှဲပြီး Proof ဓာတ်ပုံ ပို့ပေးပါ။",
             reply_markup=reply_markup
         )
         return
@@ -2141,7 +2141,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "⭐ **Basic (7,000 MMK)**\n"
                 "💎 **Premium (20,000 MMK)**\n"
                 "👑 **Premium+ (35,000 MMK)**\n\n"
-                "📸 ငွေလွှဲပြီး Proof ဓာတ်ပုံ ပို့ပေးပါ။"
+                "📸 ငွေလွှဲပြီး Proof ဓာတ်ပုံ ပို့ပေးပါ။",
                 reply_markup=reply_markup
             )
             return
