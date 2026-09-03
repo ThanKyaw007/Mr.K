@@ -1639,19 +1639,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_tip_feedback(update, context)
         return
 
-    if data == "start_help":
-        await query.edit_message_text(
-            "📌 အသုံးပြုနည်း:\n"
-            "/start - စတင်ရန်\n"
-            "/help - အကူအညီ\n"
-            "/subscribe - Plan ရွေးရန်\n"
-            "/ask <q> - မေးရန်\n"
-            "/status - အနေအထား\n"
-            "/profile - ကိုယ်ရေးမှတ်တမ်း\n"
-            "/habit - အလေ့အထ\n"
-            "/referral - ဖိတ်ရန်\n\n"
-            "🎯 ကျွန်တော် အကြံပေးနိုင်တဲ့ နယ်ပယ် ၁၂၀+ ခုရှိပါတယ်။"
-        )
+            )
         return
 
     if data.startswith("sub_"):
