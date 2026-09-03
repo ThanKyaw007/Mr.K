@@ -341,7 +341,7 @@ def init_db():
         except sqlite3.OperationalError:
             pass
     
-            c.execute("""CREATE TABLE IF NOT EXISTS users (
+    c.execute("""CREATE TABLE IF NOT EXISTS users (
         user_id TEXT PRIMARY KEY,
         plan TEXT DEFAULT 'free',
         usage_count INTEGER DEFAULT 0,
@@ -367,7 +367,7 @@ def init_db():
         except sqlite3.OperationalError:
             pass
     
-            c.execute("""CREATE TABLE IF NOT EXISTS referrals (
+    c.execute("""CREATE TABLE IF NOT EXISTS referrals (
         inviter_id TEXT, invited_id TEXT, timestamp TEXT
     )""")
     
@@ -1059,7 +1059,7 @@ async def send_daily_coaching(bot):
         conn.close()
 
         if not users:
-            return
+            return         
 
        prompt = (
             "မင်္ဂလာပါ၊ ဒီနေ့အတွက် နေ့စဉ် ဘဝလမ်းညွှန်စကား (Daily Coaching Message) ကို မစ္စတာသန်း (Mr.T) ရဲ့ အသံနဲ့ ရေးပါ။\n"
@@ -2273,6 +2273,7 @@ def main():
     application.add_handler(CommandHandler("readphoto", read_photo_command))
     application.add_handler(CommandHandler("image", image))
     application.add_handler(CommandHandler("news", news_command))
+    application.add_handler(CommandHandler("daily", daily)
     
     # ✅ New Auto-Verify Commands
     application.add_handler(CommandHandler("gen_code", gen_code))      # Admin code generator
