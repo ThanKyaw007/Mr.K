@@ -1639,9 +1639,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_tip_feedback(update, context)
         return
 
-            )
-        return
-
     if data.startswith("sub_"):
         plan = data.replace("sub_", "")
         if plan not in PLAN_LIMITS:
