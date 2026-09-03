@@ -1054,7 +1054,7 @@ async def send_daily_coaching(bot):
     try:
         conn = sqlite3.connect("bot_users.db", check_same_thread=False)
         c = conn.cursor()
-        c.execute("SELECT user_id FROM users WHERE plan IN ('free', 'premium_plus')")
+        c.execute("SELECT user_id FROM users WHERE plan IN ('premium', 'premium_plus')")
         users = c.fetchall()
         conn.close()
 
