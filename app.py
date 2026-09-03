@@ -62,7 +62,7 @@ PAYMENT_INFO = (
 
 PLAN_LIMITS = {
     "free": {
-        "limit": 50,
+        "limit": 80,
         "price": 0,
         "prices": {"1m": 0, "3m": 0, "12m": 0}
     },
