@@ -1095,6 +1095,51 @@ async def send_daily_coaching(bot):
     except Exception as e:
         logger.error(f"❌ Daily coaching error: {e}")
 
+# ====== Send Weekly Tips ======
+async def send_weekly_tips(bot):
+    """တစ်ပတ်တစ်ခါ သိကောင်းစရာ (Tips) ပို့ပေးတဲ့ Function"""
+    try:
+        conn = sqlite3.connect("bot_users.db", check_same_thread=False)
+        c = conn.cursor()
+        c.execute("SELECT user_id FROM users")
+        users = c.fetchall()
+        conn.close()
+
+        if not users:
+            logger.info("📭 No users found for weekly tips.")
+            return
+
+        # Tip သုံးမျိုးကို သတ်မှတ်ထားတယ်
+        tips = [
+            "💡 သိကောင်းစရာ #1\n\n"
+            "မစ္စတာသန်းက ပုံတွေကိုပါ ဖန်တီးပေးနိုင်ပါတယ်။\n"
+            "/image နောက်မှာ သင်ဖန်တီးချင်တဲ့ ပုံအကြောင်း ရိုက်ထည့်လိုက်ရုံပါ။\n\n"
+            "ဥပမာ – /image လှပတဲ့ မြန်မာ့ရွှေဘုရား",
+
+            "💡 သိကောင်းစရာ #2\n\n"
+            "စာသားတွေကို အသံဖိုင်အဖြစ် ပြောင်းချင်ရင် /tts ကို သုံးပါ။\n\n"
+            "ဥပမာ – /tts ဒီနေ့ ရာသီဥတု သာယာပါတယ်။",
+
+            "💡 သိကောင်းစရာ #3\n\n"
+            "နေ့စဉ်သတင်း၊ ဗေဒင်နဲ့ ကိုးကားချက်တွေကို တစ်နေရာတည်းမှာ ရယူချင်ရင် /daily ကိုနှိပ်ပါ။"
+        ]
+        
+        # ကျပန်း တစ်ခုကို ရွေးမယ်
+        selected_tip = random.choice(tips)
+        
+        sent = 0
+        for user in users:
+            try:
+                await bot.send_message(chat_id=int(user[0]), text=selected_tip)
+                sent += 1
+                await asyncio.sleep(0.05)  # Rate limit မကျော်အောင်
+            except Exception as e:
+                logger.error(f"Failed to send tip to {user[0]}: {e}")
+        
+        logger.info(f"✅ Weekly tips sent to {sent} users.")
+    except Exception as e:
+        logger.error(f"❌ Weekly tips error: {e}")
+
 # ====== Scheduler ======
 def run_scheduler(bot):
     schedule.every(30).days.do(reset_usage)
@@ -1103,13 +1148,16 @@ def run_scheduler(bot):
     now_mm = datetime.now(mm_tz)
     
     schedule.every().day.at("08:00").do(lambda: asyncio.run(send_daily_coaching(bot)))
-    schedule.every().day.at("03:00").do(lambda: backup_and_send(bot))
+    schedule.every().day.at("03:00").do(lambda: asyncio.run(backup_and_send(bot)))
+    
+    # ✅ တစ်ပတ်တစ်ခါ သိကောင်းစရာ ပို့မယ် (တနင်္ဂနွေနေ့ မနက် ၉ နာရီ)
+    schedule.every().week.at("09:00").do(lambda: asyncio.run(send_weekly_tips(bot)))
     
     logger.info("⏰ Scheduler started (Myanmar Time).")
+    logger.info("📅 Weekly tips scheduled for every Sunday at 09:00 AM.")
     while True:
         schedule.run_pending()
         time.sleep(60)
-
 # ====== Rate Limiting for verifyid ======
 verify_attempts = {}
 
@@ -1301,18 +1349,28 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📌 အသုံးပြုနည်း:\n"
-        "/start - စတင်ရန်\n"
-        "/help - အကူအညီ\n"
-        "/subscribe - Plan ရွေးရန်\n"
-        "/ask <q> - မေးရန်\n"
-        "/status - အနေအထား\n"
-        "/profile - ကိုယ်ရေးမှတ်တမ်း\n"
-        "/habit - အလေ့အထ\n"
-        "/referral - ဖိတ်ရန်\n"
-        "/gen_code - Admin code generator\n"
-        "/verifyid - User self-verify\n\n"
-        "🎯 ကျွန်တော် အကြံပေးနိုင်တဲ့ နယ်ပယ် ၁၂၀+ ခုရှိပါတယ်။"
+        "📌 **မစ္စတာသန်း (Mr.T) က ဘာတွေလုပ်ပေးနိုင်လဲ?**\n\n"
+        "💬 **စကားပြော / အကြံဉာဏ်**\n"
+        "   • /ask <မေးခွန်း> – ဘာပဲမေးမေး ဖြေပေးမယ်\n"
+        "   • /daily – နေ့စဉ်သတင်း၊ ဗေဒင်၊ ကိုးကားချက်\n\n"
+        
+        "🎨 **ဖန်တီးမှုဆိုင်ရာ**\n"
+        "   • /image <ဖော်ပြချက်> – ပုံတွေကို AI နဲ့ ဖန်တီးပေးမယ်\n"
+        "   • /tts <စာသား> – စာသားကို အသံဖိုင်အဖြစ် ပြောင်းပေးမယ်\n"
+        "   • /cv – CV (ကိုယ်ရေးရာဇဝင်) ဖိုင်ထုတ်ပေးမယ်\n\n"
+        
+        "🔧 **အသုံးဝင်တဲ့ကိရိယာများ**\n"
+        "   • /weather <မြို့> – ရာသီဥတုကို ပြောပြမယ်\n"
+        "   • /news – နောက်ဆုံးရသတင်းတွေကို ဖတ်ပေးမယ်\n"
+        "   • /sum <ဂဏန်းများ> – ဂဏန်းပေါင်းချပေးမယ်\n\n"
+        
+        "📊 **အကောင့်ဆိုင်ရာ**\n"
+        "   • /status – သင့်ရဲ့ အသုံးပြုမှုအခြေအနေကို ပြမယ်\n"
+        "   • /subscribe – Plan အဆင့်မြှင့်ရန်\n"
+        "   • /referral – သူငယ်ချင်းတွေကို ဖိတ်ပြီး အကျိုးကျေးဇူးရယူပါ\n\n"
+        
+        "💡 **အကြံပြုချက်**\n"
+        "ဒီအချက်တွေကို သုံးကြည့်ပြီး မစ္စတာသန်းရဲ့ စွမ်းရည်ကို ရှာဖွေလိုက်ပါ။ 🚀"
     )
 
 async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
