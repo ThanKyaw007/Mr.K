@@ -1089,8 +1089,7 @@ async def send_daily_coaching(bot):
         conn.close()
 
         if not users:
-            return
-            
+            return            
             
         prompt = (    
              "မင်္ဂလာပါ၊ ဒီနေ့အတွက် နေ့စဉ် ဘဝလမ်းညွှန်စကား (Daily Coaching Message) ကို မစ္စတာသန်း (Mr.T) ရဲ့ အသံနဲ့ ရေးပါ။\n"
