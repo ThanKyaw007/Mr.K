@@ -1954,6 +1954,57 @@ async def news_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await fetch_news(update, context)
 
+async def daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """📅 နေ့စဉ်အချက်အလက်များ - သတင်း၊ ဗေဒင်၊ ကိုးကားချက်"""
+    user_id = str(update.effective_user.id)
+    
+    # ၁. သုံးစွဲသူရဲ့ မွေးနေ့ကို ယူမယ် (ဗေဒင်အတွက်)
+    user_data = get_user(user_id)
+    birthdate = user_data[12] if user_data and len(user_data) > 12 else None
+    
+    # ၂. သတင်းတွေ ယူမယ်
+    news_text = ""
+    try:
+        url = "https://news.google.com/rss?hl=en&gl=MM&ceid=MM:en"
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            root = ET.fromstring(response.text)
+        items = root.findall(".//item")[:3]  # ထိပ်ဆုံး ၃ ခုပဲယူမယ်
+        if items:
+            news_text = "📰 **နေ့စဉ်သတင်းအနှစ်ချုပ်**\n"
+            for i, item in enumerate(items, 1):
+                title = item.find("title").text
+                news_text += f"{i}. {title}\n"
+    except Exception as e:
+        news_text = "📰 သတင်းယူလို့မရပါဘူး။ နောက်မှထပ်ကြိုးစားပါ။"
+    
+    # ၃. ဗေဒင်ဟောချက် (မွေးနေ့ရှိမှပဲ)
+    astrology_text = ""
+    if birthdate:
+        try:
+            prompt = f"ဒီနေ့အတွက် {birthdate} မွေးနေ့ရှိသူရဲ့ ဗေဒင်ဟောချက် (အချစ်၊ အလုပ်၊ ငွေကြေး) ကို အတိုချုံးပြီး မြန်မာလိုရေးပါ။"
+            astrology_text = await ask_model(prompt, user_id)
+            astrology_text = "🔮 **ဒီနေ့ဗေဒင်ဟောချက်**\n" + astrology_text[:300] + "..."
+        except Exception as e:
+            astrology_text = "🔮 ဗေဒင်ယူလို့မရပါဘူး။"
+    else:
+        astrology_text = "🔮 ဗေဒင်ဟောချက်အတွက် ကျေးဇူးပြုပြီး `/profile birthdate : YYYY-MM-DD` နဲ့ မွေးနေ့သိမ်းပါ။"
+    
+    # ၄. နေ့စဉ်ကိုးကားချက် (Motivational Quote)
+    quote_text = ""
+    try:
+        prompt = "ဒီနေ့အတွက် စိတ်ဓာတ်ခွန်အားဖြစ်စေမယ့် ကိုးကားချက် (Motivational Quote) တစ်ခုကို မြန်မာလိုရေးပါ။"
+        quote = await ask_model(prompt, user_id)
+        quote_text = "💡 **နေ့စဉ်ကိုးကားချက်**\n" + quote[:200]
+    except Exception as e:
+        quote_text = "💡 ကိုးကားချက်ယူလို့မရပါဘူး။"
+    
+    # ၅. အားလုံးကို ပေါင်းပြီး ပြန်ပေးမယ်
+    final_message = f"📅 **နေ့စဉ်အချက်အလက်များ**\n\n{news_text}\n\n{astrology_text}\n\n{quote_text}"
+    
+    await update.message.reply_text(final_message, disable_web_page_preview=True)
+
 # ====== Admin Commands ======
 async def pending_requests(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
