@@ -1061,7 +1061,11 @@ async def send_daily_coaching(bot):
         if not users:
             return
 
-        prompt = "မင်္ဂလာပါ၊ ဒီနေ့အတွက် နေ့စဉ် ဘဝလမ်းညွှန်စကား (Daily Coaching Message) ကို မစ္စတာသန်း (Mr.T) ရဲ့ အသံနဲ့ ရေးပါ။ ယုံကြည်မှု၊ အလုပ်အကိုင်၊ ငွေကြေးအတွေးအခေါ် အကြောင်းတွေ ပါစေ။"
+       prompt = (
+    "မင်္ဂလာပါ၊ ဒီနေ့အတွက် နေ့စဉ် ဘဝလမ်းညွှန်စကား (Daily Coaching Message) ကို မစ္စတာသန်း (Mr.T) ရဲ့ အသံနဲ့ ရေးပါ။\n"
+    "ယုံကြည်မှု၊ အလုပ်အကိုင်၊ ငွေကြေးအတွေးအခေါ် အကြောင်းတွေ ပါစေ။\n"
+    "တနင်္လာနေ့ဆို အလုပ်စတင်ဖို့ စိတ်ဓာတ်ခွန်အား၊ ကြာသပတေးနေ့ဆို ငွေကြေးဆိုင်ရာ အကြံဉာဏ်မျိုး ပါအောင်လုပ်ပါ။"
+)
         message = await ask_model(prompt)
         if not message or len(message) < 10:
             message = "🌅 ဒီနေ့အတွက် အကောင်းဆုံး နေ့တစ်နေ့ ဖြစ်ပါစေ။"
@@ -2169,7 +2173,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         bot_name = get_bot_name(text)
         if bot_name:
             answer = f"{bot_name} ပြောတယ်... {answer}"
-        await update.message.reply_text(answer, disable_web_page_preview=True)
+        await update.message.reply_text(
+    f"{answer}\n\n💬 ဒီအဖြေ အဆင်ပြေရဲ့လား? အကြံပြုချက်ရှိရင် ပြန်ပြောပါဗျာ။"
+)
 
 async def is_bot_mentioned(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     if not update.message or not update.message.text:
