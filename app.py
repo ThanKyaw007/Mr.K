@@ -89,6 +89,12 @@ IMAGE_LIMITS = {
     "premium": 500,
     "premium_plus": 2000
 }
+TTS_CHAR_LIMITS = {
+    "free": 100,
+    "basic": 500,
+    "premium": 1000,
+    "premium_plus": 2000
+}
 
 def get_plan_price(plan, duration="1m"):
     return PLAN_LIMITS[plan]["prices"].get(duration, PLAN_LIMITS[plan]["price"])
@@ -1908,11 +1914,31 @@ async def get_weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"⚠️ Error: {str(e)[:100]}")
 
 async def text_to_speech(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    
     if not context.args:
         await update.message.reply_text("Usage: /tts <စာသား> (အသံထုတ်ချင်တဲ့ စာသားကို ရိုက်ပါ)")
         return
 
     text = " ".join(context.args)
+    
+    # ၁. Plan ကိုယူမယ်
+    user = get_user(user_id)
+    if not user:
+        add_user(user_id, "free")
+        plan = "free"
+    else:
+        plan = user[0]
+    
+    # ၂. စာလုံးအရေအတွက် ကန့်သတ်ချက်စစ်မယ်
+    char_limit = TTS_CHAR_LIMITS.get(plan, 100)
+    if len(text) > char_limit:
+        await update.message.reply_text(
+            f"❌ သင့် {plan} Plan အတွက် စာလုံး {char_limit} လုံးအထိပဲ သုံးလို့ရပါတယ်။\n"
+            f"📌 သင်ရိုက်ထားတာ {len(text)} လုံးရှိပါတယ်။ အတိုချုံးပြီး ထပ်ကြိုးစားပါ။"
+        )
+        return
+
     await update.message.reply_text("🔊 အသံဖိုင်ကို ဖန်တီးနေပါတယ်...")
 
     try:
@@ -1921,11 +1947,14 @@ async def text_to_speech(update: Update, context: ContextTypes.DEFAULT_TYPE):
         tts.save(filename)
 
         with open(filename, "rb") as f:
-            await update.message.reply_audio(audio=f, title="Mr.T ဖတ်ပေးတဲ့ အသံ", caption="🔊 အသံဖိုင် ပါ။")
+            await update.message.reply_audio(
+                audio=f, 
+                title="Mr.T ဖတ်ပေးတဲ့ အသံ", 
+                caption=f"🔊 အသံဖိုင် ({len(text)} လုံး)"
+            )
         os.remove(filename)
     except Exception as e:
         await update.message.reply_text(f"⚠️ Error: {str(e)[:100]}")
-
 async def fetch_news(update: Update, context: ContextTypes.DEFAULT_TYPE, topic: str = None):
     await update.message.reply_text("📰 သတင်းတွေ ရှာနေပါတယ်... ခဏစောင့်ပါ...")
     try:
