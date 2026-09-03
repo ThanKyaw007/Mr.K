@@ -408,6 +408,23 @@ def init_db():
     c.execute("CREATE INDEX IF NOT EXISTS idx_transactions_plan ON transactions(plan)")
     
     # ✅ Migration for existing columns
+        # ✅ Add columns for feedback system
+    for col in ["receive_tips", "tip_feedback"]:
+        try:
+            c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
+        except sqlite3.OperationalError:
+            pass
+    
+    # ✅ Create table for tip analytics
+    c.execute("""CREATE TABLE IF NOT EXISTS tip_analytics (
+        tip_id TEXT PRIMARY KEY,
+        content TEXT,
+        likes INTEGER DEFAULT 0,
+        dislikes INTEGER DEFAULT 0,
+        sent_count INTEGER DEFAULT 0,
+        last_sent TEXT
+    )""")
+    
     for col in ["proof_status", "proof_file_id", "price", "proof_timestamp", "goals", "weaknesses", "dream", "career", "money_mindset", "relationship", "birthdate"]:
         try:
             c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
@@ -1095,51 +1112,164 @@ async def send_daily_coaching(bot):
     except Exception as e:
         logger.error(f"❌ Daily coaching error: {e}")
 
-# ====== Send Weekly Tips ======
 async def send_weekly_tips(bot):
-    """တစ်ပတ်တစ်ခါ သိကောင်းစရာ (Tips) ပို့ပေးတဲ့ Function"""
+    """တစ်ပတ်တစ်ခါ သိကောင်းစရာ (Tips) ပို့ပေးတဲ့ Function (Feedback ပါ)"""
     try:
         conn = sqlite3.connect("bot_users.db", check_same_thread=False)
         c = conn.cursor()
-        c.execute("SELECT user_id FROM users")
-        users = c.fetchall()
-        conn.close()
-
-        if not users:
-            logger.info("📭 No users found for weekly tips.")
-            return
-
-        # Tip သုံးမျိုးကို သတ်မှတ်ထားတယ်
-        tips = [
-            "💡 သိကောင်းစရာ #1\n\n"
-            "မစ္စတာသန်းက ပုံတွေကိုပါ ဖန်တီးပေးနိုင်ပါတယ်။\n"
-            "/image နောက်မှာ သင်ဖန်တီးချင်တဲ့ ပုံအကြောင်း ရိုက်ထည့်လိုက်ရုံပါ။\n\n"
-            "ဥပမာ – /image လှပတဲ့ မြန်မာ့ရွှေဘုရား",
-
-            "💡 သိကောင်းစရာ #2\n\n"
-            "စာသားတွေကို အသံဖိုင်အဖြစ် ပြောင်းချင်ရင် /tts ကို သုံးပါ။\n\n"
-            "ဥပမာ – /tts ဒီနေ့ ရာသီဥတု သာယာပါတယ်။",
-
-            "💡 သိကောင်းစရာ #3\n\n"
-            "နေ့စဉ်သတင်း၊ ဗေဒင်နဲ့ ကိုးကားချက်တွေကို တစ်နေရာတည်းမှာ ရယူချင်ရင် /daily ကိုနှိပ်ပါ။"
+        
+        # Tips တွေကို သတ်မှတ်ထားတယ်
+        tips_data = [
+            {
+                "id": "1",
+                "content": "💡 သိကောင်းစရာ #1\n\n"
+                           "မစ္စတာသန်းက ပုံတွေကိုပါ ဖန်တီးပေးနိုင်ပါတယ်။\n"
+                           "/image နောက်မှာ သင်ဖန်တီးချင်တဲ့ ပုံအကြောင်း ရိုက်ထည့်လိုက်ရုံပါ။\n\n"
+                           "ဥပမာ – /image လှပတဲ့ မြန်မာ့ရွှေဘုရား"
+            },
+            {
+                "id": "2",
+                "content": "💡 သိကောင်းစရာ #2\n\n"
+                           "စာသားတွေကို အသံဖိုင်အဖြစ် ပြောင်းချင်ရင် /tts ကို သုံးပါ။\n\n"
+                           "ဥပမာ – /tts ဒီနေ့ ရာသီဥတု သာယာပါတယ်။"
+            },
+            {
+                "id": "3",
+                "content": "💡 သိကောင်းစရာ #3\n\n"
+                           "နေ့စဉ်သတင်း၊ ဗေဒင်နဲ့ ကိုးကားချက်တွေကို တစ်နေရာတည်းမှာ ရယူချင်ရင် /daily ကိုနှိပ်ပါ။"
+            }
         ]
         
-        # ကျပန်း တစ်ခုကို ရွေးမယ်
-        selected_tip = random.choice(tips)
+        # သုံးစွဲသူတွေကို ယူမယ်
+        c.execute("SELECT user_id FROM users WHERE receive_tips IS NULL OR receive_tips != '0'")
+        users = c.fetchall()
+        
+        if not users:
+            logger.info("📭 No users found for weekly tips.")
+            conn.close()
+            return
         
         sent = 0
         for user in users:
             try:
-                await bot.send_message(chat_id=int(user[0]), text=selected_tip)
+                # တစ်ယောက်ချင်းစီအတွက် ကျပန်းရွေးမယ်
+                selected_tip = random.choice(tips_data)
+                
+                # Tip analytics ကို update လုပ်မယ်
+                c.execute("""
+                    INSERT INTO tip_analytics (tip_id, content, sent_count, last_sent)
+                    VALUES (?, ?, 1, ?)
+                    ON CONFLICT(tip_id) DO UPDATE SET
+                        sent_count = sent_count + 1,
+                        last_sent = ?
+                """, (selected_tip["id"], selected_tip["content"], datetime.utcnow().isoformat(), datetime.utcnow().isoformat()))
+                conn.commit()
+                
+                # Inline Keyboard ထည့်မယ်
+                keyboard = [
+                    [
+                        InlineKeyboardButton("👍 ကြိုက်တယ်", callback_data=f"like_tip_{selected_tip['id']}"),
+                        InlineKeyboardButton("👎 မကြိုက်ဘူး", callback_data=f"dislike_tip_{selected_tip['id']}")
+                    ]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await bot.send_message(
+                    chat_id=int(user[0]),
+                    text=f"{selected_tip['content']}\n\n📊 ဒီအကြောင်းအရာ ကြိုက်လား? အောက်က ခလုတ်နှိပ်ပြီး ပြောပါ။",
+                    reply_markup=reply_markup
+                )
                 sent += 1
-                await asyncio.sleep(0.05)  # Rate limit မကျော်အောင်
+                await asyncio.sleep(0.05)
             except Exception as e:
                 logger.error(f"Failed to send tip to {user[0]}: {e}")
         
+        conn.close()
         logger.info(f"✅ Weekly tips sent to {sent} users.")
+        
+        # Tip analytics ကို စစ်ဆေးပြီး မကြိုက်တဲ့ Tip ကို အလိုအလျောက်ပြောင်းမယ်
+        await analyze_tip_performance()
+        
     except Exception as e:
         logger.error(f"❌ Weekly tips error: {e}")
 
+# ====== Tip Feedback System ======
+async def handle_tip_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """သုံးစွဲသူက Tip ကို Like/Dislike လုပ်တဲ့အခါ လုပ်ဆောင်မယ်"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = str(query.from_user.id)
+    data = query.data
+    
+    # data က "like_tip_1" ဒါမှမဟုတ် "dislike_tip_1" လိုမျိုး ဖြစ်မယ်
+    parts = data.split("_")
+    if len(parts) < 3:
+        return
+    
+    action = parts[0]  # like သို့မဟုတ် dislike
+    tip_id = parts[2]  # tip နံပါတ်
+    
+    try:
+        conn = sqlite3.connect("bot_users.db", check_same_thread=False)
+        c = conn.cursor()
+        
+        # Tip analytics ကို update လုပ်မယ်
+        if action == "like":
+            c.execute("UPDATE tip_analytics SET likes = likes + 1 WHERE tip_id = ?", (tip_id,))
+            await query.edit_message_text(
+                "👍 ကျေးဇူးပါ။ ဒီအကြောင်းအရာကို ကြိုက်တယ်ဆိုတာ သိရလို့ ဝမ်းသာပါတယ်။ 😊"
+            )
+        elif action == "dislike":
+            c.execute("UPDATE tip_analytics SET dislikes = dislikes + 1 WHERE tip_id = ?", (tip_id,))
+            await query.edit_message_text(
+                "🙏 ကျေးဇူးပါ။ ဒီအကြောင်းအရာကို မကြိုက်ဘူးဆိုတာ သိရလို့ နောက်တစ်ခါ ပိုကောင်းအောင် ပြင်ဆင်ပါ့မယ်။ 😊"
+            )
+        
+        # User ရဲ့ feedback ကို သိမ်းမယ်
+        c.execute("UPDATE users SET tip_feedback = ? WHERE user_id = ?", (data, user_id))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.error(f"❌ Feedback error: {e}")
+        await query.edit_message_text("⚠️ အမှားတစ်ခုဖြစ်သွားပါတယ်။ နောက်မှထပ်ကြိုးစားပါ။")
+
+async def analyze_tip_performance():
+    """Tip analytics ကို စစ်ဆေးပြီး မကောင်းတဲ့ Tip ကို အလိုအလျောက်ပြောင်းမယ်"""
+    try:
+        conn = sqlite3.connect("bot_users.db", check_same_thread=False)
+        c = conn.cursor()
+        
+        c.execute("""
+            SELECT tip_id, likes, dislikes, sent_count 
+            FROM tip_analytics 
+            WHERE sent_count > 0
+        """)
+        results = c.fetchall()
+        
+        for tip_id, likes, dislikes, sent_count in results:
+            # Like/Dislike အချိုးကို တွက်မယ်
+            if sent_count > 0:
+                like_ratio = likes / sent_count
+                dislike_ratio = dislikes / sent_count
+                
+                # ၅၀% ကျော် Dislike ရခဲ့ရင် Tip ကို ပြောင်းလဲမယ်
+                if dislike_ratio > 0.5 and sent_count >= 5:
+                    logger.info(f"⚠️ Tip {tip_id} has {dislike_ratio*100:.0f}% dislikes. Updating content...")
+                    
+                    # Tip အသစ်ကို ထည့်မယ်
+                    new_content = (
+                        "💡 သိကောင်းစရာ အသစ်\n\n"
+                        "မစ္စတာသန်းက သင့်အတွက် နောက်ထပ် အသုံးဝင်တဲ့ အချက်တွေကို ပြောပြပေးသွားမှာပါ။\n\n"
+                        "📌 ဘာတွေသိချင်လဲ? /ask နဲ့ မေးလိုက်ပါ။"
+                    )
+                    c.execute("UPDATE tip_analytics SET content = ? WHERE tip_id = ?", (new_content, tip_id))
+                    conn.commit()
+                    logger.info(f"✅ Tip {tip_id} updated with new content.")
+        
+        conn.close()
+    except Exception as e:
+        logger.error(f"❌ Analyze tip performance error: {e}")
 # ====== Scheduler ======
 def run_scheduler(bot):
     schedule.every(30).days.do(reset_usage)
@@ -1502,6 +1632,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📸 ကျေးဇူးပြုပြီး ငွေသွင်း proof screenshot ကို ပို့ပါ။\n\n"
             f"{PAYMENT_INFO}"
         )
+        return
+
+        # ====== Tip Feedback ======
+    if data.startswith("like_tip_") or data.startswith("dislike_tip_"):
+        await handle_tip_feedback(update, context)
         return
 
     if data == "start_help":
