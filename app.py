@@ -1983,7 +1983,7 @@ async def daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
     astrology_text = ""
     if birthdate:
         try:
-            prompt = f"ဒီနေ့အတွက် {birthdate} မွေးနေ့ရှိသူရဲ့ ဗေဒင်ဟောချက် (အချစ်၊ အလုပ်၊ ငွေကြေး) ကို အတိုချုံးပြီး မြန်မာလိုရေးပါ။"
+            prompt = "ဒီနေ့အတွက် {birthdate} မွေးနေ့ရှိသူရဲ့ ဗေဒင်ဟောချက် (အချစ်၊ အလုပ်၊ ငွေကြေး) ကို အတိုချုံးပြီး မြန်မာလိုရေးပါ။"
             astrology_text = await ask_model(prompt, user_id)
             astrology_text = "🔮 **ဒီနေ့ဗေဒင်ဟောချက်**\n" + astrology_text[:300] + "..."
         except Exception as e:
