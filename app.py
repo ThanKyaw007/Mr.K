@@ -93,7 +93,7 @@ def get_duration_label(duration):
 def get_price_usd(price_mmk):
     return round(price_mmk / EXCHANGE_RATE, 2)
 
-BOT_NAMES = ["မစ္စတာသန်း", "ကိုသန်း", "သန်း"]
+BOT_NAMES = ["မစ္စတာသန်း", "ကိုသန်း", "သန်း" , "မစ္စတာတီ" , "အကို" , "Mr.T" , "MrT"]
 
 # ====== Flask App ======
 flask_app = Flask(__name__)
