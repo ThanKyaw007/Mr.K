@@ -1635,6 +1635,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
         # ====== Tip Feedback ======
+    if data == "start_help":
+        await help_command(update, context)
+        return
+        
     if data.startswith("like_tip_") or data.startswith("dislike_tip_"):
         await handle_tip_feedback(update, context)
         return
