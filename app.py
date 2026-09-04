@@ -1693,7 +1693,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📌 **{plan.upper()}** Plan ကို **{duration_label}** အတွက် ရွေးလိုက်ပါပြီ။\n"
             f"💰 စျေးနှုန်း: {price:,} MMK\n"
             f"⏰ သက်တမ်းကုန်ဆုံးရက်: {expiry_date[:10]}\n\n"
-            f"📌 **ငွေလွှဲပြီးလျှင် ScreenShot ကို ဤ chat တွင် ပို့ပေးပါ။**\n\n"
+            f"📸 **ငွေလွှဲပြီးလျှင် ScreenShot ကို ဤ chat တွင် ပို့ပေးပါ။**\n\n"
             f"{PAYMENT_INFO}"        
            
         )
