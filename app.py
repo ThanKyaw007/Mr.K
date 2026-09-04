@@ -1556,6 +1556,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
 
     # ... (ရှိပြီးသား start_help, sub_, verify_, send_code_)
+    if not data:
+        return
 
     if data == "start_plan":
         keyboard = [
