@@ -2506,10 +2506,7 @@ def main():
     application.add_handler(CommandHandler("approve_proof", approve_proof))
     application.add_handler(CommandHandler("reject_proof", reject_proof))
     application.add_handler(CommandHandler("broadcast", broadcast))
-    application.add_handler(CallbackQueryHandler(button_handler))
-    application.add_handler(CommandHandler("gen_code", gen_code))
-    application.add_handler(CommandHandler("verifyid", verifyid))
-    
+        
     # Callback & Message Handlers
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(MessageHandler(filters.PHOTO & (~filters.COMMAND), photo_handler))
