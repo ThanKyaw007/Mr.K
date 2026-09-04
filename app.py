@@ -1573,7 +1573,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=reply_markup
         )
         return
-
+    
     if data == "start_help":
         await help_command(update, context)
         return
@@ -1631,14 +1631,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         duration_label = get_duration_label(duration)
         
+                # 👇 ဒီစာသားမှာ ငွေလွှဲအချက်အလက် လုံးဝမပါဘူး
         await query.edit_message_text(
-            f"📌 **{plan.upper()}** Plan ကို **{duration_label}** အတွက် ရွေးလိုက်ပါပြီ။\n"
-            f"💰 စျေးနှုန်း: {price:,} MMK\n"
+            f"📌 **FREE** Plan ကို **၁ လ** အတွက် ရွေးလိုက်ပါပြီ။\n"
+            f"💰 စျေးနှုန်း: 0 MMK\n"
             f"⏰ သက်တမ်းကုန်ဆုံးရက်: {expiry_date[:10]}\n\n"
-            f"📸 ကျေးဇူးပြုပြီး ငွေသွင်း proof screenshot ကို ပို့ပါ။\n\n"
-            f"{PAYMENT_INFO}"
+            "✅ **အခုဆိုရင် Free Plan ကို စတင်အသုံးပြုနိုင်ပါပြီ။ 🎉**"
         )
-        return
+        return  # 👈 ဒီနေရာမှာ ရပ်လိုက်လို့ အောက်က ငွေလွှဲစာတွေ မပါတော့ဘူး
 
         # ====== Tip Feedback ======
          
