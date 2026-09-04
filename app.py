@@ -1587,16 +1587,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(query.from_user.id)
     data = query.data
 
-    # ... (ရှိပြီးသား start_help, sub_, verify_, send_code_)
     if not data:
         return
 
+    # ====== Plan Selection Menu ======
     if data == "start_plan":
         keyboard = [
-           [InlineKeyboardButton("📌 Free (အခမဲ့)", callback_data="sub_free_1m")],
-           [InlineKeyboardButton("⭐ Basic (7,000 MMK/လ)", callback_data="show_price_basic")],
-           [InlineKeyboardButton("💎 Premium (20,000 MMK/လ)", callback_data="show_price_premium")],
-           [InlineKeyboardButton("👑 Premium+ (35,000 MMK/လ)", callback_data="show_price_premium_plus")],
+            [InlineKeyboardButton("📌 Free (အခမဲ့)", callback_data="sub_free")],   # ✅ sub_free ကိုပြောင်းပါ
+            [InlineKeyboardButton("⭐ Basic (7,000 MMK/လ)", callback_data="show_price_basic")],
+            [InlineKeyboardButton("💎 Premium (20,000 MMK/လ)", callback_data="show_price_premium")],
+            [InlineKeyboardButton("👑 Premium+ (35,000 MMK/လ)", callback_data="show_price_premium_plus")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
@@ -1605,12 +1605,37 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=reply_markup
         )
         return
-    
+
     if data == "start_help":
         await help_command(update, context)
         return
 
-    # ====== Show Price (Plan) ======
+    # ====== ✅ Free Plan အတွက် သီးခြားကိုင်တွယ်ခြင်း ======
+    if data == "sub_free":
+        expiry_date = (datetime.utcnow() + timedelta(days=30)).isoformat()
+        conn = sqlite3.connect("bot_users.db", check_same_thread=False)
+        c = conn.cursor()
+        c.execute("""
+            UPDATE users 
+            SET plan='free', 
+                usage_count=0, 
+                proof_status='none', 
+                price=0, 
+                duration='1m',
+                expiry_date=?
+            WHERE user_id=?
+        """, (expiry_date, user_id))
+        conn.commit()
+        conn.close()
+        await query.edit_message_text(
+            f"📌 **FREE** Plan ကို **၁ လ** အတွက် ရွေးလိုက်ပါပြီ။\n"
+            f"💰 စျေးနှုန်း: 0 MMK\n"
+            f"⏰ သက်တမ်းကုန်ဆုံးရက်: {expiry_date[:10]}\n\n"
+            "✅ **အခုဆိုရင် Free Plan ကို စတင်အသုံးပြုနိုင်ပါပြီ။ 🎉**"
+        )
+        return
+
+    # ====== Show Price (Paid Plans) ======
     if data.startswith("show_price_"):
         plan = data.replace("show_price_", "")
         if plan not in PLAN_LIMITS:
@@ -1635,7 +1660,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # ====== Subscribe with Duration ======
+    # ====== Subscribe with Duration (Paid Plans Only) ======
     if data.startswith("sub_"):
         parts = data.split("_", 2)
         if len(parts) < 3:
@@ -1643,105 +1668,71 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         plan = parts[1]
         duration = parts[2]
-        
+
         if plan not in PLAN_LIMITS:
             await query.edit_message_text("❌ Invalid plan.")
             return
         if duration not in ["1m", "3m", "12m"]:
             await query.edit_message_text("❌ Invalid duration.")
             return
-        
+
+        # Free Plan ကို အပေါ်မှာ ကိုင်တွယ်ပြီးသားမို့ ဒီနေရာက Paid Plans အတွက်ပါ
         price = get_plan_price(plan, duration)
         expiry_date = calculate_expiry(duration)
-        
+
         conn = sqlite3.connect("bot_users.db", check_same_thread=False)
         c = conn.cursor()
         c.execute("UPDATE users SET plan=?, proof_status='waiting', price=?, duration=?, expiry_date=? WHERE user_id=?",
                   (plan, price, duration, expiry_date, user_id))
         conn.commit()
         conn.close()
-        
-        duration_label = get_duration_label(duration)
-        
-                # 👇 ဒီစာသားမှာ ငွေလွှဲအချက်အလက် လုံးဝမပါဘူး
-        await query.edit_message_text(
-            f"📌 **FREE** Plan ကို **၁ လ** အတွက် ရွေးလိုက်ပါပြီ။\n"
-            f"💰 စျေးနှုန်း: 0 MMK\n"
-            f"⏰ သက်တမ်းကုန်ဆုံးရက်: {expiry_date[:10]}\n\n"
-            "✅ **အခုဆိုရင် Free Plan ကို စတင်အသုံးပြုနိုင်ပါပြီ။ 🎉**"
-        )
-        return  # 👈 ဒီနေရာမှာ ရပ်လိုက်လို့ အောက်က ငွေလွှဲစာတွေ မပါတော့ဘူး
 
-        # ====== Tip Feedback ======
-         
+        duration_label = get_duration_label(duration)
+
+        await query.edit_message_text(
+            f"📌 **{plan.upper()}** Plan ကို **{duration_label}** အတွက် ရွေးလိုက်ပါပြီ။\n"
+            f"💰 စျေးနှုန်း: {price:,} MMK\n"
+            f"⏰ သက်တမ်းကုန်ဆုံးရက်: {expiry_date[:10]}\n\n"
+            f"📸 ကျေးဇူးပြုပြီး ငွေသွင်း proof screenshot ကို ပို့ပါ။\n\n"
+            f"{PAYMENT_INFO}"
+        )
+        return
+
+    # ====== Tip Feedback ======
     if data.startswith("like_tip_") or data.startswith("dislike_tip_"):
         await handle_tip_feedback(update, context)
         return
 
-    if data.startswith("sub_"):
-        plan = data.replace("sub_", "")
-        if plan not in PLAN_LIMITS:
-            await query.edit_message_text("❌ Invalid plan.")
-            return
-
-        conn = sqlite3.connect("bot_users.db", check_same_thread=False)
-        c = conn.cursor()
-        c.execute("UPDATE users SET plan=?, proof_status='waiting', price=? WHERE user_id=?", (plan, PLAN_LIMITS[plan]["price"], user_id))
-        conn.commit()
-        conn.close()
-
-        price_mmk = PLAN_LIMITS[plan]["price"]
-        price_usd = get_price_usd(price_mmk)
-
-        text = (
-            f"📌 **{plan}** Plan ကို ရွေးလိုက်ပါပြီ။\n"
-            f"💰 စျေးနှုန်း: {price_mmk:,} MMK (~${price_usd}) / month\n\n"
-            f"📸 ကျေးဇူးပြုပြီး ငွေသွင်း proof screenshot ကို ပို့ပါ။\n\n"
-            f"{PAYMENT_INFO}"
-        )
-        await query.edit_message_text(text)
-
+    # ====== Verify Code ======
     if data.startswith("verify_"):
         tx_id = data.replace("verify_", "")
-        
-        # Check if code exists and is valid
         conn = get_db_connection()
         c = conn.cursor()
         c.execute("SELECT plan, used, expiry_date FROM transactions WHERE tx_id=? AND user_id=?", (tx_id, user_id))
         row = c.fetchone()
-        
         if not row:
             await query.edit_message_text("❌ Code မရှိပါဘူး။")
             conn.close()
             return
-        
         plan, used, expiry_date = row
-        
         if used == 1:
             await query.edit_message_text("❌ ဒီ Code က သုံးပြီးသားပါ။")
             conn.close()
             return
-        
         if expiry_date and datetime.utcnow().isoformat() > expiry_date:
             await query.edit_message_text("❌ ဒီ Code ရဲ့ သက်တမ်းကုန်သွားပါပြီ။")
             conn.close()
             return
-        
-        # Mark as used and upgrade plan
         c.execute("UPDATE transactions SET used=1 WHERE tx_id=? AND user_id=?", (tx_id, user_id))
         price = PLAN_LIMITS[plan]["price"]
         c.execute("UPDATE users SET plan=?, proof_status='approved', usage_count=0, price=? WHERE user_id=?",
                   (plan, price, user_id))
         conn.commit()
         conn.close()
-        
-        # Send confirmation to user
         await query.edit_message_text(
             f"🎉 **Plan အဆင့်မြှင့်ပြီးပါပြီ။**\n\n"
             f"📌 Plan: **{plan}**"
         )
-        
-        # Notify admin
         for admin_id in ADMIN_IDS:
             try:
                 await context.bot.send_message(
@@ -1753,21 +1744,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.error(f"Admin notification error: {e}")
         return
 
+    # ====== Send Code (Admin) ======
     if data.startswith("send_code_"):
         if user_id not in [str(a) for a in ADMIN_IDS]:
             await query.edit_message_text("❌ Admin only.")
             return
-        
-        # data က "send_code_123456789_premium" လိုမျိုး ဖြစ်မယ်
         parts = data.split("_", 2)
         if len(parts) < 3:
             await query.edit_message_text("❌ Invalid request.")
             return
-        
         target_user = parts[1]
         plan = parts[2]
-        
-        # Generate unique 5-digit code
         import random
         tx_id = None
         for _ in range(10):
@@ -1780,23 +1767,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not exists:
                 tx_id = candidate
                 break
-        
         if not tx_id:
             await query.edit_message_text("❌ Code ထုတ်လို့မရပါဘူး။ နောက်တစ်ခါ ကြိုးစားပါ။")
             return
-        
-        # 1 day expiry
         expiry_date = (datetime.utcnow() + timedelta(days=1)).isoformat()
-        
-        # Save to database
         conn = get_db_connection()
         c = conn.cursor()
         c.execute("INSERT INTO transactions (tx_id, user_id, plan, timestamp, used, expiry_date) VALUES (?, ?, ?, ?, ?, ?)",
                   (tx_id, target_user, plan, datetime.utcnow().isoformat(), 0, expiry_date))
         conn.commit()
         conn.close()
-        
-        # Send code to user
         try:
             await context.bot.send_message(
                 chat_id=int(target_user),
@@ -1814,8 +1794,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"⚠️ User `{target_user}` ဆီ ပို့လို့မရပါဘူး။\n"
                 f"Code: `{tx_id}` ကို ကိုယ်တိုင်ပို့ပေးပါ။"
             )
-        
-        # Update user's proof_status
         conn = get_db_connection()
         c = conn.cursor()
         c.execute("UPDATE users SET proof_status='pending' WHERE user_id=?", (target_user,))
