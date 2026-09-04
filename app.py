@@ -1986,7 +1986,7 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "📸 Screenshot ကို လက်ခံရရှိပါပြီ။\n\n"
         "💡 သင့် Plan ကို အသက်သွင်းရန် ကျေးဇူးပြုပြီး အောက်ပါအတိုင်း လုပ်ဆောင်ပါ:\n"
-        "1️⃣ Admin ထံမှ Code ကို ရယူပါ\n"
+        "1️⃣ Admin ထံမှ Code ကို ရယူရန် ခေတ္တစောင့်ပါ\n"
         "2️⃣ /verifyid <code> လို့ရိုက်ထည့်ပါ"
     )
     
