@@ -1695,6 +1695,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"⏰ သက်တမ်းကုန်ဆုံးရက်: {expiry_date[:10]}\n\n"
             f"📸 ကျေးဇူးပြုပြီး ငွေသွင်း proof screenshot ကို ပို့ပါ။\n\n"
             f"{PAYMENT_INFO}"
+            f"📌 **ငွေလွှဲပြီးလျှင် စခရင်ရှော့ကို ဤ chat တွင် ပို့ပေးပါ။**"  # ဒီစာကြောင်းကို ထည့်ပါ
         )
         return
 
