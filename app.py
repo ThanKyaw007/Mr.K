@@ -2255,7 +2255,7 @@ async def pending_requests(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     conn = get_db_connection()
     c = conn.cursor()
-     c.execute("SELECT user_id, plan FROM users WHERE proof_status IN ('waiting', 'pending') AND plan != 'free'")
+    c.execute("SELECT user_id, plan FROM users WHERE proof_status IN ('waiting', 'pending') AND plan != 'free'")
     
     results = c.fetchall()
     conn.close()
